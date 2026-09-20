@@ -39,6 +39,9 @@ ScaffoldingReadMe.txt
 # dotenv environment variables file
 .env
 
+# Claude memory
+.claude/memory*
+
 # Others
 ~$*
 *~
