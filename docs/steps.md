@@ -68,7 +68,7 @@ Commit: `8969c1b`
 
 ## ✅ Step 4 — Host.Stdio (build + config wiring verified; real-account run still needed)
 
-Commit: (pending)
+Commit: `c0e0a3c`
 
 - Added `Microsoft.Extensions.Hosting` and `ModelContextProtocol` packages to `Host.Stdio`.
 - **Program.cs**: two entry points off `args`:
