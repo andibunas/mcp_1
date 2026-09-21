@@ -18,6 +18,7 @@ docs/
   PLAN.md                         # architecture, build order, environment notes
   steps.md                        # detailed log of steps done + what's left
   setup.md                        # Google Cloud project + folder access setup
+Dockerfile                        # builds/runs Host.Web; also the EC2/ECS/App Runner artifact
 ```
 
 ## Prerequisites
@@ -38,5 +39,7 @@ docs/
   `dotnet run --project src/McpGoogleDrive.Host.Stdio -- setup` runs the interactive folder-grant
   flow. Build and config-binding are verified for both; an actual run against a real Google Drive
   account still needs your own Google Cloud credentials (see [docs/setup.md](docs/setup.md)).
-- Docker and Lambda hosts are not yet implemented — see [docs/steps.md](docs/steps.md) for the
-  current step.
+- A `Dockerfile` builds/runs `Host.Web` (also the artifact for EC2/ECS/App Runner). The underlying
+  `dotnet publish` step is verified; `docker build`/`run` are not, since Docker isn't installed in
+  this dev environment.
+- The Lambda host is not yet implemented — see [docs/steps.md](docs/steps.md) for the current step.

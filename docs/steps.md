@@ -124,13 +124,27 @@ Commit: `ba38ea3`
   step 4, since the eager-auth step blocks server startup without real credentials in this
   environment.
 
-## ⬜ Step 6 — Docker
+## ✅ Step 6 — Docker (Dockerfile written; `docker build`/`run` not runnable in this environment)
 
-- Write a `Dockerfile` (multi-stage: SDK build → runtime image) that builds and runs `Host.Web`.
-- Verify `docker build` + `docker run` locally, hitting the containerized server the same way as
-  step 5's local verification.
-- This image is the artifact reused for EC2, ECS/Fargate, and App Runner in step 7 — no separate
-  Dockerfiles per AWS target.
+Commit: (pending)
+
+- Added a multi-stage `Dockerfile` at the repo root: `mcr.microsoft.com/dotnet/sdk:10.0` build
+  stage (restore on `.csproj` files first for layer caching, then `dotnet publish` `Host.Web`) →
+  `mcr.microsoft.com/dotnet/aspnet:10.0` runtime stage, listening on `:8080`
+  (`ASPNETCORE_URLS=http://+:8080`), `ENTRYPOINT ["dotnet", "McpGoogleDrive.Host.Web.dll"]`.
+- Added `.dockerignore` (bin/obj/.git/docs/markdown excluded from the build context).
+- **Headless/container OAuth caveat, documented in `docs/setup.md`**: the container has no browser
+  to complete the OAuth "installed app" flow, so `FileTokenStore`'s default
+  `~/.mcp-google-drive` directory needs to be mounted in from a host that already ran
+  `Host.Stdio -- setup` (`docker run -v ~/.mcp-google-drive:/root/.mcp-google-drive ...`) — a
+  proper `SecretsManagerTokenStore` for deployments where that isn't practical is still step 7.
+- **Verified**: `dotnet publish src/McpGoogleDrive.Host.Web/McpGoogleDrive.Host.Web.csproj -c
+  Release -o <dir>` (the exact command the Dockerfile's build stage runs) succeeds and produces
+  the expected output (`McpGoogleDrive.Host.Web.dll`, its dependencies, `appsettings.json`).
+- **Not verified**: `docker build`/`docker run` themselves — **Docker is not installed in this
+  environment** (`which docker` finds nothing), so the Dockerfile has not actually been built or
+  run. This needs to happen on a machine with Docker before step 6 can be considered fully done;
+  flagging honestly rather than claiming it works.
 
 ## ⬜ Step 7 — AWS
 

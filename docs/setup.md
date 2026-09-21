@@ -62,6 +62,20 @@ It will:
    }
    ```
 
+## Running in Docker / headless (EC2, etc.)
+
+The container has no browser, so it can't complete the OAuth "installed app" sign-in flow itself.
+Run `dotnet run --project src/McpGoogleDrive.Host.Stdio -- setup` locally first (with a browser) to
+obtain a refresh token, then mount `~/.mcp-google-drive` into the container at the same path so
+`FileTokenStore` finds the existing token instead of trying to sign in again:
+
+```
+docker run -v ~/.mcp-google-drive:/root/.mcp-google-drive -p 8080:8080 <image>
+```
+
+A `SecretsManagerTokenStore` (AWS Secrets Manager-backed, for deployments where mounting a local
+folder isn't practical) is planned for the AWS build phase — see docs/steps.md step 7.
+
 ## Where tokens are stored
 
 Refresh tokens are persisted via `ITokenStore` (see `McpGoogleDrive.Core/Auth/`):

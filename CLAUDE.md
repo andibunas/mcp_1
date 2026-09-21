@@ -24,6 +24,12 @@ dotnet run --project src/McpGoogleDrive.Host.Web              # start the MCP se
 
 All three require real Google OAuth credentials configured via user-secrets or env vars (never edit them into the committed `appsettings.json` files) — see `docs/setup.md`. Without them, each command fails fast with a clear `GoogleAuth:ClientId and GoogleAuth:ClientSecret are not configured` error rather than hanging. `Host.Lambda` builds but isn't wired to the MCP SDK yet.
 
+```
+docker build -t mcp-google-drive .   # build the Host.Web image (untested here — no Docker in this dev environment)
+```
+
+Note: the container has no browser to complete OAuth sign-in — see the "Running in Docker / headless" section of `docs/setup.md` for mounting a token obtained from a local `setup` run.
+
 ## Architecture
 
 - **`src/McpGoogleDrive.Core`** — all real logic, no hosting concerns:
@@ -38,4 +44,4 @@ All three require real Google OAuth credentials configured via user-secrets or e
 
 ## Status
 
-See [docs/steps.md](docs/steps.md) for the current step and what's done. As of the last update: Core's Drive access, auth, config, interactive setup, and MCP tool definitions are implemented and unit tested; `Host.Stdio` and `Host.Web` are both wired to the MCP SDK and build/config-verified (a real end-to-end run needs a user's own Google Cloud credentials — not yet done). `Host.Lambda` is still unwired.
+See [docs/steps.md](docs/steps.md) for the current step and what's done. As of the last update: Core's Drive access, auth, config, interactive setup, and MCP tool definitions are implemented and unit tested; `Host.Stdio` and `Host.Web` are both wired to the MCP SDK and build/config-verified (a real end-to-end run needs a user's own Google Cloud credentials — not yet done). A `Dockerfile` for `Host.Web` exists and its `dotnet publish` step is verified, but `docker build`/`run` themselves are untested since Docker isn't installed here. `Host.Lambda` is still unwired.
