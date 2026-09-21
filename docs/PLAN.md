@@ -59,7 +59,7 @@ Build Docker/EC2 first since it's the most direct extension of "local," then Lam
 ## Build order (staged)
 
 1. **Scaffold** the solution and all four projects, plus the test project. ✅ Done.
-2. **Core**: Drive client wrapper + folder allow-list enforcement + `ITokenStore`/`FileTokenStore` + config model + the interactive Picker-based setup command. Unit-testable without any MCP or hosting code. Write `docs/setup.md` alongside this step.
+2. **Core**: Drive client wrapper + folder allow-list enforcement + `ITokenStore`/`FileTokenStore` + config model + the interactive Picker-based setup command. Unit-testable without any MCP or hosting code. Write `docs/setup.md` alongside this step. ✅ Done.
 3. **Core**: MCP tool definitions on top of the Drive wrapper (list/read/write/create/move), using the `ModelContextProtocol` SDK.
 4. **Host.Stdio**: wire it up, verify end-to-end against a real Google Drive account with Claude Desktop or the MCP inspector CLI.
 5. **Host.Web**: wire up HTTP transport, verify locally with the MCP inspector or `curl`.
