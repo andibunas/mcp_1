@@ -32,5 +32,10 @@ docs/
   `ITokenStore` (local file implementation), config model, the interactive Picker-based
   folder-grant flow, and MCP tool definitions (`drive_list_files`/`drive_read_file`/
   `drive_write_file`/`drive_move_file`) are all implemented and unit tested (`dotnet test`, 15/15).
-- Host wiring (stdio, HTTP, Docker, Lambda) is not yet implemented — see [docs/steps.md](docs/steps.md)
-  for the current step.
+- `McpGoogleDrive.Host.Stdio` is wired up: `dotnet run --project src/McpGoogleDrive.Host.Stdio`
+  starts an MCP server over stdio (for Claude Desktop/Code), and
+  `dotnet run --project src/McpGoogleDrive.Host.Stdio -- setup` runs the interactive folder-grant
+  flow. Build and config-binding are verified; an actual run against a real Google Drive account
+  still needs your own Google Cloud credentials (see [docs/setup.md](docs/setup.md)).
+- HTTP, Docker, and Lambda hosts are not yet implemented — see [docs/steps.md](docs/steps.md) for
+  the current step.

@@ -66,15 +66,37 @@ Commit: `8969c1b`
 - **Known gap, by design**: no host registers `DriveTools`/`DriveFileService`/`IGoogleDriveApi` with
   a DI container or an `AddMcpServer()` call yet — that's step 4.
 
-## ⬜ Step 4 — Host.Stdio
+## ✅ Step 4 — Host.Stdio (build + config wiring verified; real-account run still needed)
 
-- Build a Generic Host in `Program.cs`: bind `GoogleAuthOptions`/`DriveAccessOptions` from
-  `appsettings.json` + env vars, call `AddAllowedFoldersFile()`, register `Core` services,
-  `AddMcpServer().WithStdioServerTransport().WithToolsFromAssembly()`.
-- Add a `setup` verb (`dotnet run -- setup`) that calls `InteractiveSetupService.RunAsync()` —
-  this is where step 2's setup flow actually becomes runnable.
-- Verify end-to-end: connect it as an MCP server in Claude Desktop or Claude Code, or drive it with
-  the MCP inspector CLI, against a real Google Drive account.
+Commit: (pending)
+
+- Added `Microsoft.Extensions.Hosting` and `ModelContextProtocol` packages to `Host.Stdio`.
+- **Program.cs**: two entry points off `args`:
+  - Default: `Host.CreateApplicationBuilder()` → bind `GoogleAuthOptions`/`DriveAccessOptions` from
+    `appsettings.json` + env vars → `builder.Configuration.AddAllowedFoldersFile()` → register Core
+    services (`ITokenStore`/`GoogleAuthService`/`DriveFileService`/`IGoogleDriveApi` factory) →
+    `AddMcpServer().WithStdioServerTransport().WithToolsFromAssembly(typeof(DriveTools).Assembly)`.
+  - `setup`: same DI wiring minus the MCP server, calls `InteractiveSetupService.RunAsync()` and
+    prints the granted folders.
+- **Stdout discipline**: `builder.Logging.ClearProviders()` + `AddConsole(... LogToStandardErrorThreshold = LogLevel.Trace)`
+  so nothing but MCP protocol messages ever hits stdout — the default console logger would
+  otherwise corrupt the stdio transport.
+- **Eager auth at startup**: `host.Services.GetRequiredService<DriveFileService>()` is resolved
+  right after `builder.Build()`, before `RunAsync()`, so the OAuth browser flow (or a config error)
+  happens during startup instead of stalling the first tool call mid-request.
+- Added `appsettings.json` with empty `GoogleAuth`/`DriveAccess` placeholders (real secrets go in
+  user-secrets or env vars, documented in `docs/setup.md` — never edit real values into this
+  committed file), wired to copy to the build output.
+- **Verified**: `dotnet build` (whole solution) and `dotnet test` (15/15) both pass. Ran
+  `dotnet run --project src/McpGoogleDrive.Host.Stdio` and the `setup` variant with no credentials
+  configured — both fail fast with the clear `GoogleAuth:ClientId and GoogleAuth:ClientSecret are
+  not configured...` message (from `GoogleAuthService`) rather than hanging or crashing opaquely,
+  confirming config binding, `AddAllowedFoldersFile()`, and the eager-auth wiring all execute
+  correctly end to end.
+- **Not verified (needs the user's own Google Cloud credentials + a browser)**: the actual OAuth
+  sign-in, Picker folder selection, and a real MCP tool call round-trip (e.g. via Claude
+  Desktop/Code or the MCP inspector CLI) against a live Drive account. That's a manual step for
+  whoever has real credentials to run once `docs/setup.md`'s Google Cloud project setup is done.
 
 ## ⬜ Step 5 — Host.Web
 
