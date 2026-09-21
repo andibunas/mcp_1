@@ -16,6 +16,7 @@ test/
   McpGoogleDrive.Core.Tests/
 docs/
   PLAN.md                         # architecture, build order, environment notes
+  steps.md                        # detailed log of steps done + what's left
   setup.md                        # Google Cloud project + folder access setup
 ```
 

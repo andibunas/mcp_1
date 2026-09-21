@@ -2,6 +2,7 @@
 
 > Working plan for this repo. Update this file as the design changes — it's the
 > source of truth for "why is this structured this way," not a one-time snapshot.
+> For a step-by-step log of what's done vs. left, see [steps.md](steps.md).
 
 ## Context
 
