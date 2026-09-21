@@ -146,14 +146,49 @@ Commit: `24f0d50`
   run. This needs to happen on a machine with Docker before step 6 can be considered fully done;
   flagging honestly rather than claiming it works.
 
-## ⬜ Step 7 — AWS
+## ✅ Step 7 — AWS (code + docs written; no real AWS account used, nothing deployed)
 
-- Implement `SecretsManagerTokenStore` (`ITokenStore` backed by AWS Secrets Manager) for
-  headless/AWS-hosted token persistence.
-- Document/script an EC2 deployment: `docker run` the step 6 image on an instance, or run it as a
-  systemd service.
-- Build `Host.Lambda`: wrap `Host.Web`'s app via `Amazon.Lambda.AspNetCoreServer.Hosting`, deploy
-  behind a Lambda Function URL in `RESPONSE_STREAM` invoke mode (needed for MCP's Streamable HTTP).
-  Confirm the SDK's streaming behavior actually works through that path; fall back to the SDK's
-  stateless HTTP mode for this host specifically if it doesn't.
-- Re-run the MCP inspector checks from steps 4/5 against the deployed public endpoint(s).
+Commit: (pending)
+
+- **`SecretsManagerTokenStore`** (`Core/Auth/SecretsManagerTokenStore.cs`): `ITokenStore` backed by
+  AWS Secrets Manager (`GetSecretValueAsync`/`PutSecretValueAsync`/`CreateSecretAsync`/
+  `DeleteSecretAsync` via `IAmazonSecretsManager`), one secret per key named
+  `{secretPrefix}{key}`. Unit tested with `Moq` (added as a test-only dependency — `IAmazonSecretsManager`
+  has too large a surface to hand-write a fake the way `FakeGoogleDriveApi` does): load
+  hit/miss, save-creates-when-missing vs. save-updates-when-present, delete-of-missing-is-a-no-op.
+  20/20 tests passing overall.
+- **`ServiceCollectionExtensions.AddDriveCoreServices()`** changed from `AddSingleton<ITokenStore>`
+  to `TryAddSingleton<ITokenStore>`, so a host can register its own `ITokenStore` (e.g. Lambda's
+  Secrets Manager one) before calling it and have that registration win, instead of always getting
+  `FileTokenStore`.
+- **`Host.Lambda`**: switched from `Microsoft.NET.Sdk` (console) to `Microsoft.NET.Sdk.Web`, added
+  `Amazon.Lambda.AspNetCoreServer.Hosting` and `ModelContextProtocol.AspNetCore`. `Program.cs`
+  mirrors `Host.Web`'s wiring (`AddDriveCoreServices()`, `AddMcpServer().WithHttpTransport()`,
+  eager auth, `MapMcp()`), plus `AddAWSLambdaHosting(LambdaEventSource.HttpApi, options =>
+  options.EnableResponseStreaming = true)` and registers `SecretsManagerTokenStore` (not
+  `FileTokenStore`) before `AddDriveCoreServices()`, since Lambda has no durable local disk across
+  invocations. The same executable runs via Kestrel locally or the Lambda runtime when deployed —
+  `AddAWSLambdaHosting` picks based on environment variables.
+- **`template.yaml`** (SAM): container-image Lambda function, Function URL with
+  `InvokeMode: RESPONSE_STREAM` (required for MCP's Streamable HTTP transport over a Function URL),
+  and an IAM policy scoped to the `mcp-google-drive/*` Secrets Manager prefix.
+- **`src/McpGoogleDrive.Host.Lambda/Dockerfile`**: container image build for the Lambda function,
+  based on `public.ecr.aws/lambda/dotnet:10` — **explicitly flagged as unverified** (that base
+  image tag's existence for .NET 10 was not checked against AWS's registry).
+- **`docs/deploy-aws.md`**: covers both AWS options from the plan — EC2/ECS/App Runner via the
+  step 6 Docker image, and Lambda via `template.yaml` — including how to get a locally-obtained
+  OAuth refresh token into Secrets Manager (neither path can complete the browser sign-in flow
+  itself), and IAM permissions needed. States plainly at the top that nothing here has been
+  deployed or tested against a real AWS account.
+- **Verified**: `dotnet build` (whole solution) and `dotnet test` (20/20) pass. Ran
+  `dotnet run --project src/McpGoogleDrive.Host.Lambda` locally with no AWS config — it fails at
+  `AmazonSecretsManagerClient` construction with `AmazonClientException: No RegionEndpoint or
+  ServiceURL configured`, which is the AWS SDK's own correct behavior when no region is resolvable
+  (Lambda sets `AWS_REGION` automatically in its real execution environment; a bare local machine
+  doesn't) — confirms the AWS SDK wiring is real and reaches actual AWS client validation, not a
+  silent no-op.
+- **Not verified, and said so rather than assumed**: no AWS account/credentials were used or
+  available in this session. `docker build`/`sam build`/`sam deploy` were not run; the EC2 and
+  Lambda deployment steps, the Lambda base image tag, and the `RESPONSE_STREAM` Function URL
+  streaming behavior are all unverified against real infrastructure. These are the concrete
+  follow-ups for whoever has an AWS account to run this on.

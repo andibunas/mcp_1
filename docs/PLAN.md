@@ -65,7 +65,7 @@ Build Docker/EC2 first since it's the most direct extension of "local," then Lam
 4. **Host.Stdio**: wire it up, verify end-to-end against a real Google Drive account with Claude Desktop or the MCP inspector CLI. ✅ Wired and build/config-verified; real-account end-to-end run still pending (needs a user's own Google Cloud credentials — see docs/steps.md).
 5. **Host.Web**: wire up HTTP transport, verify locally with the MCP inspector or `curl`. ✅ Wired (DI wiring shared with Host.Stdio via `Core.AddDriveCoreServices()`) and build/config-verified; real-account end-to-end run still pending — see docs/steps.md.
 6. **Dockerfile** for Host.Web; verify `docker run` locally. ✅ Dockerfile written and the underlying `dotnet publish` step verified; `docker build`/`run` themselves not verified — Docker isn't installed in this dev environment. See docs/steps.md.
-7. **AWS**: `SecretsManagerTokenStore`, then EC2/Docker deployment, then Lambda host + Function URL streaming.
+7. **AWS**: `SecretsManagerTokenStore`, then EC2/Docker deployment, then Lambda host + Function URL streaming. ✅ Code and docs (docs/deploy-aws.md, template.yaml) written; nothing deployed or tested against a real AWS account — no AWS credentials were used. See docs/steps.md for exactly what's verified vs. not.
 
 Steps 1–6 get a fully working local (stdio + HTTP + Docker) server. Step 7 is the AWS layer, tackled after that foundation is solid.
 
