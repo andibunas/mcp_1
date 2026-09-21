@@ -148,7 +148,7 @@ Commit: `24f0d50`
 
 ## ✅ Step 7 — AWS (code + docs written; no real AWS account used, nothing deployed)
 
-Commit: (pending)
+Commit: `4ef1591`
 
 - **`SecretsManagerTokenStore`** (`Core/Auth/SecretsManagerTokenStore.cs`): `ITokenStore` backed by
   AWS Secrets Manager (`GetSecretValueAsync`/`PutSecretValueAsync`/`CreateSecretAsync`/
