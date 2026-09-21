@@ -100,7 +100,7 @@ Commit: `c0e0a3c`
 
 ## ✅ Step 5 — Host.Web (build + config wiring verified; real-account run still needed)
 
-Commit: (pending)
+Commit: `ba38ea3`
 
 - Added `ModelContextProtocol.AspNetCore` to `Host.Web`.
 - **Refactored the DI wiring introduced in step 4 into `Core/ServiceCollectionExtensions.cs`**
