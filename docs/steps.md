@@ -98,11 +98,31 @@ Commit: `c0e0a3c`
   Desktop/Code or the MCP inspector CLI) against a live Drive account. That's a manual step for
   whoever has real credentials to run once `docs/setup.md`'s Google Cloud project setup is done.
 
-## ⬜ Step 5 — Host.Web
+## ✅ Step 5 — Host.Web (build + config wiring verified; real-account run still needed)
 
-- Same DI/config wiring as Host.Stdio, but `AddMcpServer().WithHttpTransport()` mapped on an
-  ASP.NET Core minimal API.
-- Verify locally with the MCP inspector or `curl` against `localhost`.
+Commit: (pending)
+
+- Added `ModelContextProtocol.AspNetCore` to `Host.Web`.
+- **Refactored the DI wiring introduced in step 4 into `Core/ServiceCollectionExtensions.cs`**
+  (`AddDriveCoreServices(IConfiguration)`) — options binding, token store, auth, `DriveFileService`,
+  the `IGoogleDriveApi` factory. Both `Host.Stdio` and `Host.Web` now call this one method instead
+  of duplicating the same ~15 lines; `Host.Stdio`'s `Program.cs` was updated to use it too, so the
+  two hosts stay in sync. Required adding `Microsoft.Extensions.DependencyInjection.Abstractions`
+  and `Microsoft.Extensions.Options.ConfigurationExtensions` to `Core`.
+- **Program.cs**: `WebApplication.CreateBuilder()` → `AddAllowedFoldersFile()` →
+  `AddDriveCoreServices()` → `AddMcpServer().WithHttpTransport().WithToolsFromAssembly(...)` →
+  eager `DriveFileService` resolution before `app.Run()` (same startup-not-mid-request rationale as
+  step 4) → `app.MapMcp()`.
+- Added `GoogleAuth`/`DriveAccess` placeholder sections to `Host.Web/appsettings.json` (already
+  present from the ASP.NET Core template; extended, not created).
+- **Verified**: `dotnet build` (whole solution) and `dotnet test` (15/15) pass. Ran both
+  `Host.Stdio` and `Host.Web` with no credentials configured after the refactor — both still fail
+  fast with the same clear config error, confirming the extracted `AddDriveCoreServices()` behaves
+  identically to the pre-refactor inline wiring for both hosts.
+- **Not verified (needs the user's own Google Cloud credentials + a browser)**: an actual HTTP MCP
+  session (`curl`/MCP inspector against `localhost`) or a real Drive tool call — same limitation as
+  step 4, since the eager-auth step blocks server startup without real credentials in this
+  environment.
 
 ## ⬜ Step 6 — Docker
 

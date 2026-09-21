@@ -1,13 +1,11 @@
-using McpGoogleDrive.Core.Auth;
+using McpGoogleDrive.Core;
 using McpGoogleDrive.Core.Configuration;
 using McpGoogleDrive.Core.Drive;
 using McpGoogleDrive.Core.Setup;
 using McpGoogleDrive.Core.Tools;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 if (args is ["setup", ..])
 {
@@ -17,23 +15,6 @@ if (args is ["setup", ..])
 
 await RunServerAsync();
 
-static void ConfigureCoreServices(IServiceCollection services)
-{
-    services.AddSingleton<ITokenStore>(new FileTokenStore());
-    services.AddSingleton<GoogleAuthService>();
-    services.AddSingleton<DriveFolderPickerService>();
-    services.AddSingleton<InteractiveSetupService>();
-    services.AddSingleton<DriveFileService>();
-    services.AddSingleton<IGoogleDriveApi>(sp =>
-    {
-        var auth = sp.GetRequiredService<GoogleAuthService>();
-        var driveOptions = sp.GetRequiredService<IOptions<DriveAccessOptions>>().Value;
-        var authOptions = sp.GetRequiredService<IOptions<GoogleAuthOptions>>().Value;
-        var credential = auth.AuthorizeAsync(driveOptions.Scopes).GetAwaiter().GetResult();
-        return new GoogleDriveApi(credential, authOptions.ApplicationName);
-    });
-}
-
 static async Task RunServerAsync()
 {
     var builder = Host.CreateApplicationBuilder();
@@ -41,9 +22,7 @@ static async Task RunServerAsync()
     // Layer in folder IDs saved by a previous `setup` run, on top of appsettings/env vars.
     builder.Configuration.AddAllowedFoldersFile();
 
-    builder.Services.Configure<GoogleAuthOptions>(builder.Configuration.GetSection(GoogleAuthOptions.SectionName));
-    builder.Services.Configure<DriveAccessOptions>(builder.Configuration.GetSection(DriveAccessOptions.SectionName));
-    ConfigureCoreServices(builder.Services);
+    builder.Services.AddDriveCoreServices(builder.Configuration);
 
     // Stdio transport uses stdout exclusively for the MCP protocol; any other stdout write
     // (including the default console logger) would corrupt it, so logs go to stderr instead.
@@ -67,9 +46,7 @@ static async Task RunServerAsync()
 static async Task RunSetupAsync()
 {
     var builder = Host.CreateApplicationBuilder();
-    builder.Services.Configure<GoogleAuthOptions>(builder.Configuration.GetSection(GoogleAuthOptions.SectionName));
-    builder.Services.Configure<DriveAccessOptions>(builder.Configuration.GetSection(DriveAccessOptions.SectionName));
-    ConfigureCoreServices(builder.Services);
+    builder.Services.AddDriveCoreServices(builder.Configuration);
 
     var host = builder.Build();
     var setup = host.Services.GetRequiredService<InteractiveSetupService>();

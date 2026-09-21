@@ -63,7 +63,7 @@ Build Docker/EC2 first since it's the most direct extension of "local," then Lam
 2. **Core**: Drive client wrapper + folder allow-list enforcement + `ITokenStore`/`FileTokenStore` + config model + the interactive Picker-based setup command. Unit-testable without any MCP or hosting code. Write `docs/setup.md` alongside this step. ✅ Done.
 3. **Core**: MCP tool definitions on top of the Drive wrapper (list/read/write/create/move), using the `ModelContextProtocol` SDK. ✅ Done.
 4. **Host.Stdio**: wire it up, verify end-to-end against a real Google Drive account with Claude Desktop or the MCP inspector CLI. ✅ Wired and build/config-verified; real-account end-to-end run still pending (needs a user's own Google Cloud credentials — see docs/steps.md).
-5. **Host.Web**: wire up HTTP transport, verify locally with the MCP inspector or `curl`.
+5. **Host.Web**: wire up HTTP transport, verify locally with the MCP inspector or `curl`. ✅ Wired (DI wiring shared with Host.Stdio via `Core.AddDriveCoreServices()`) and build/config-verified; real-account end-to-end run still pending — see docs/steps.md.
 6. **Dockerfile** for Host.Web; verify `docker run` locally.
 7. **AWS**: `SecretsManagerTokenStore`, then EC2/Docker deployment, then Lambda host + Function URL streaming.
 

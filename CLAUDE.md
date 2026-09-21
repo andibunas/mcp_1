@@ -19,9 +19,10 @@ dotnet test test/McpGoogleDrive.Core.Tests --filter FullyQualifiedName~DriveFile
 ```
 dotnet run --project src/McpGoogleDrive.Host.Stdio            # start the MCP server over stdio
 dotnet run --project src/McpGoogleDrive.Host.Stdio -- setup   # interactive Drive folder-grant flow
+dotnet run --project src/McpGoogleDrive.Host.Web              # start the MCP server over HTTP
 ```
 
-Both require real Google OAuth credentials configured via user-secrets or env vars (never edit them into the committed `appsettings.json`) — see `docs/setup.md`. Without them, both commands fail fast with a clear `GoogleAuth:ClientId and GoogleAuth:ClientSecret are not configured` error rather than hanging. `Host.Web`/`Host.Lambda` build but aren't wired to the MCP SDK yet.
+All three require real Google OAuth credentials configured via user-secrets or env vars (never edit them into the committed `appsettings.json` files) — see `docs/setup.md`. Without them, each command fails fast with a clear `GoogleAuth:ClientId and GoogleAuth:ClientSecret are not configured` error rather than hanging. `Host.Lambda` builds but isn't wired to the MCP SDK yet.
 
 ## Architecture
 
@@ -31,9 +32,10 @@ Both require real Google OAuth credentials configured via user-secrets or env va
   - `Setup/` — `InteractiveSetupService` + `DriveFolderPickerService` implement a browser-based folder-grant flow (serves a local page embedding the Google Picker widget over a loopback `HttpListener`) as an alternative to manually pasting folder IDs. Wired up as `Host.Stdio`'s `setup` verb.
   - `Tools/` — `DriveTools` exposes `DriveFileService` as MCP tools (`[McpServerToolType]`/`[McpServerTool]` from the `ModelContextProtocol` SDK). Kept deliberately transport-agnostic; hosts attach stdio or HTTP transport around the same tool classes.
   - `Configuration/` — options classes plus `ConfigurationBuilderExtensions.AddAllowedFoldersFile()`, which layers folder IDs saved by the interactive setup flow into `DriveAccess:AllowedFolderIds`.
-- **`src/McpGoogleDrive.Host.*`** — thin wiring only (pick a transport, pick a token store, call into Core). None should contain Drive or MCP tool logic; a new way to run the server means a new small host project, not changes to Core.
+  - `ServiceCollectionExtensions.AddDriveCoreServices(IConfiguration)` — the one place that registers options binding, `FileTokenStore`, `GoogleAuthService`, `DriveFileService`, and the `IGoogleDriveApi` factory. Both `Host.Stdio` and `Host.Web` call this instead of each re-declaring the same DI wiring; add any new host the same way rather than copying the registrations inline.
+- **`src/McpGoogleDrive.Host.*`** — thin wiring only (pick a transport, call `AddDriveCoreServices()`, start the MCP server). None should contain Drive or MCP tool logic; a new way to run the server means a new small host project, not changes to Core.
 - **`test/McpGoogleDrive.Core.Tests`** — unit tests use `FakeGoogleDriveApi` (an in-memory `IGoogleDriveApi`) to exercise allow-list enforcement and tool behavior without hitting the real Drive API.
 
 ## Status
 
-See [docs/steps.md](docs/steps.md) for the current step and what's done. As of the last update: Core's Drive access, auth, config, interactive setup, and MCP tool definitions are implemented and unit tested; `Host.Stdio` is wired to the MCP SDK and build/config-verified (a real end-to-end run needs a user's own Google Cloud credentials — not yet done). `Host.Web`/`Host.Lambda` are still unwired.
+See [docs/steps.md](docs/steps.md) for the current step and what's done. As of the last update: Core's Drive access, auth, config, interactive setup, and MCP tool definitions are implemented and unit tested; `Host.Stdio` and `Host.Web` are both wired to the MCP SDK and build/config-verified (a real end-to-end run needs a user's own Google Cloud credentials — not yet done). `Host.Lambda` is still unwired.

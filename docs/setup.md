@@ -14,10 +14,11 @@ API key) plus a list of Drive folder IDs it's allowed to touch. This doc covers 
    - Enable **Google Picker API** (APIs & Services → Library).
    - Create an **API key** (Credentials → Create Credentials → API key). Restrict it to the
      Picker API.
-5. Put these values into your host's config. `src/McpGoogleDrive.Host.Stdio/appsettings.json` ships
-   with empty placeholders for `GoogleAuth:ClientId`/`ClientSecret`/`PickerApiKey` — **don't edit
-   real secrets into that committed file.** Use one of these instead:
-   - .NET user-secrets: `dotnet user-secrets set "GoogleAuth:ClientId" "..." --project src/McpGoogleDrive.Host.Stdio` (and same for `ClientSecret`, `PickerApiKey`).
+5. Put these values into your host's config. Both `src/McpGoogleDrive.Host.Stdio/appsettings.json`
+   and `src/McpGoogleDrive.Host.Web/appsettings.json` ship with empty placeholders for
+   `GoogleAuth:ClientId`/`ClientSecret`/`PickerApiKey` — **don't edit real secrets into those
+   committed files.** Use one of these instead:
+   - .NET user-secrets: `dotnet user-secrets set "GoogleAuth:ClientId" "..." --project <host project>` (and same for `ClientSecret`, `PickerApiKey`).
    - Environment variables: `GoogleAuth__ClientId`, `GoogleAuth__ClientSecret`, `GoogleAuth__PickerApiKey`.
 
    Omit `PickerApiKey` entirely if you're only using manual folder-ID entry.
