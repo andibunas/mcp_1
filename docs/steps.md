@@ -126,7 +126,7 @@ Commit: `ba38ea3`
 
 ## ✅ Step 6 — Docker (Dockerfile written; `docker build`/`run` not runnable in this environment)
 
-Commit: (pending)
+Commit: `24f0d50`
 
 - Added a multi-stage `Dockerfile` at the repo root: `mcr.microsoft.com/dotnet/sdk:10.0` build
   stage (restore on `.csproj` files first for layer caching, then `dotnet publish` `Host.Web`) →
