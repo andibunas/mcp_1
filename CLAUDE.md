@@ -2,8 +2,33 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Project state
+## Project
 
-This repository is currently empty of code — it contains only a README and a .NET-flavored `.gitignore`. The intent, per the README, is to build an MCP (Model Context Protocol) server in .NET that provides granular Google Drive access.
+An MCP (Model Context Protocol) server in .NET providing granular, folder-scoped Google Drive access. All real logic lives in a shared library, `McpGoogleDrive.Core`; separate thin host projects wire it up for each way of running it (stdio, local HTTP, Docker, Lambda). See [docs/PLAN.md](docs/PLAN.md) for the full architecture and rationale, and [docs/steps.md](docs/steps.md) for a step-by-step log of what's built vs. what's left.
 
-No solution/project files, build tooling, or tests exist yet. There are no commands to document until the project scaffolding is created. Once a .NET solution is added, update this file with the actual build/test/run commands (e.g. `dotnet build`, `dotnet test`) and the project's architecture.
+## Commands
+
+The .NET SDK on this machine may not be on PATH in a fresh shell — if `dotnet` isn't found, use the full path `/usr/local/share/dotnet/dotnet` or `export PATH="/usr/local/share/dotnet:$PATH"` first.
+
+```
+dotnet build                                    # build the whole solution
+dotnet test test/McpGoogleDrive.Core.Tests      # run Core's unit tests
+dotnet test test/McpGoogleDrive.Core.Tests --filter FullyQualifiedName~DriveFileServiceTests  # run one test class
+```
+
+There is no `dotnet run`-able host yet (see status below) — `Host.Stdio`/`Host.Web` build but aren't wired to the MCP SDK or Core services.
+
+## Architecture
+
+- **`src/McpGoogleDrive.Core`** — all real logic, no hosting concerns:
+  - `Drive/` — `DriveFileService` is the single entry point for Drive operations, and the only place folder-scoped access is enforced: every call walks the target's parent chain and throws `FolderAccessDeniedException` unless an ancestor is in `DriveAccessOptions.AllowedFolderIds`. `IGoogleDriveApi`/`GoogleDriveApi` are the seam over `Google.Apis.Drive.v3` (the interface exists purely so tests can fake it).
+  - `Auth/` — `ITokenStore` is pluggable per host (`FileTokenStore` for local disk today; an AWS Secrets Manager implementation is planned for step 7). `GoogleAuthService` runs the OAuth "installed app" flow through whichever store is configured.
+  - `Setup/` — `InteractiveSetupService` + `DriveFolderPickerService` implement a browser-based folder-grant flow (serves a local page embedding the Google Picker widget over a loopback `HttpListener`) as an alternative to manually pasting folder IDs. Not yet wired to any CLI command — see step 4 in `docs/steps.md`.
+  - `Tools/` — `DriveTools` exposes `DriveFileService` as MCP tools (`[McpServerToolType]`/`[McpServerTool]` from the `ModelContextProtocol` SDK). Kept deliberately transport-agnostic; hosts attach stdio or HTTP transport around the same tool classes.
+  - `Configuration/` — options classes plus `ConfigurationBuilderExtensions.AddAllowedFoldersFile()`, which layers folder IDs saved by the interactive setup flow into `DriveAccess:AllowedFolderIds`.
+- **`src/McpGoogleDrive.Host.*`** — thin wiring only (pick a transport, pick a token store, call into Core). None should contain Drive or MCP tool logic; a new way to run the server means a new small host project, not changes to Core.
+- **`test/McpGoogleDrive.Core.Tests`** — unit tests use `FakeGoogleDriveApi` (an in-memory `IGoogleDriveApi`) to exercise allow-list enforcement and tool behavior without hitting the real Drive API.
+
+## Status
+
+See [docs/steps.md](docs/steps.md) for the current step and what's done. As of the last update: Core's Drive access, auth, config, interactive setup, and MCP tool definitions are implemented and unit tested; no host is wired to the MCP SDK yet.

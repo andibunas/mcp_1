@@ -29,7 +29,8 @@ docs/
 
 - Solution scaffolding: done (`McpGoogleDrive.slnx`, all four projects + tests, builds clean).
 - `McpGoogleDrive.Core`: Drive client wrapper with folder allow-list enforcement, pluggable
-  `ITokenStore` (local file implementation), config model, and the interactive Picker-based
-  folder-grant flow are implemented and unit tested (`dotnet test`).
-- MCP tool definitions and host wiring (stdio, HTTP, Docker, Lambda) are not yet implemented —
-  see [docs/PLAN.md](docs/PLAN.md) for the current step.
+  `ITokenStore` (local file implementation), config model, the interactive Picker-based
+  folder-grant flow, and MCP tool definitions (`drive_list_files`/`drive_read_file`/
+  `drive_write_file`/`drive_move_file`) are all implemented and unit tested (`dotnet test`, 15/15).
+- Host wiring (stdio, HTTP, Docker, Lambda) is not yet implemented — see [docs/steps.md](docs/steps.md)
+  for the current step.

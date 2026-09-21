@@ -42,16 +42,29 @@ Commit: `fccf73c`
 - **Known gap, by design**: nothing calls `InteractiveSetupService` yet — no CLI verb exists. That
   lands in step 4 when `Host.Stdio` gets wired up.
 
-## ⬜ Step 3 — Core: MCP tool definitions
+## ✅ Step 3 — Core: MCP tool definitions
 
-- Add the `ModelContextProtocol` C# SDK package to `Core`.
-- Define MCP tools as `[McpServerTool]`-attributed methods on top of `DriveFileService`:
-  `drive_list_files`, `drive_read_file`, `drive_write_file` (create/update), `drive_move_file`.
-  Tool descriptions should make the folder scoping visible to the calling model (e.g. mention that
-  only allowed folders are reachable).
-- Decide how `FolderAccessDeniedException` surfaces through the MCP tool-call error path (should
-  read as a clear, actionable error to the calling model, not a stack trace).
-- These tool classes must stay transport-agnostic — no stdio/HTTP-specific code here.
+Commit: (pending)
+
+- Added the `ModelContextProtocol` SDK (v2.2.0) package to `Core`.
+- **Tools/DriveTools.cs**: static `[McpServerToolType]` class with four `[McpServerTool]`-attributed
+  methods on top of `DriveFileService`: `drive_list_files`, `drive_read_file`, `drive_write_file`
+  (single tool that creates when given `parentFolderId`/`name`/`mimeType`, or overwrites when given
+  `fileId`), `drive_move_file`. Each has a `[Description]` naming the folder-scoping behavior so the
+  calling model understands why an operation might be denied.
+- `DriveFileService` is taken as a method parameter, injected by the MCP SDK's DI support — the
+  tool methods don't construct or own it, keeping them transport-agnostic (no stdio/HTTP code here).
+- Exception surfacing: relied on the SDK's default behavior (confirmed via the `McpException`/
+  `IsError` types in `ModelContextProtocol.Core.dll`) — exceptions thrown from a tool method are
+  caught by the framework and returned as an error tool result using the exception's `Message`, not
+  a stack trace. `FolderAccessDeniedException`'s message ("Access to '{id}' is denied: it is not
+  inside any allowed folder.") is already written to read as a clear model-facing error, so no
+  extra try/catch was added.
+- Unit tests: `DriveToolsTests` exercises all four tools (including the create-vs-update branch in
+  `drive_write_file` and the argument-validation error when neither path is satisfied) against
+  `FakeGoogleDriveApi`. 15/15 tests passing overall.
+- **Known gap, by design**: no host registers `DriveTools`/`DriveFileService`/`IGoogleDriveApi` with
+  a DI container or an `AddMcpServer()` call yet — that's step 4.
 
 ## ⬜ Step 4 — Host.Stdio
 
