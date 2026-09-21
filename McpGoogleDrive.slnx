@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/McpGoogleDrive.Core/McpGoogleDrive.Core.csproj" />
+    <Project Path="src/McpGoogleDrive.Host.Lambda/McpGoogleDrive.Host.Lambda.csproj" />
+    <Project Path="src/McpGoogleDrive.Host.Stdio/McpGoogleDrive.Host.Stdio.csproj" />
+    <Project Path="src/McpGoogleDrive.Host.Web/McpGoogleDrive.Host.Web.csproj" />
+  </Folder>
+  <Folder Name="/test/">
+    <Project Path="test/McpGoogleDrive.Core.Tests/McpGoogleDrive.Core.Tests.csproj" />
+  </Folder>
+</Solution>

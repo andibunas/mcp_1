@@ -1,2 +1,28 @@
 # mcp_1
-Building and MCP in .net to have granular google drive access if possible.
+
+An MCP (Model Context Protocol) server in .NET providing granular, folder-scoped Google Drive access. Runs locally (stdio for Claude Desktop/Code, or HTTP) and is deployable to AWS (Docker on EC2/ECS, or Lambda).
+
+See [docs/PLAN.md](docs/PLAN.md) for the full architecture and build plan.
+
+## Repo structure
+
+```
+src/
+  McpGoogleDrive.Core/            # Drive access, MCP tools, config — all real logic
+  McpGoogleDrive.Host.Stdio/      # local stdio host (Claude Desktop/Code)
+  McpGoogleDrive.Host.Web/        # HTTP host — also the base for Docker/EC2/Fargate
+  McpGoogleDrive.Host.Lambda/     # AWS Lambda host
+test/
+  McpGoogleDrive.Core.Tests/
+docs/
+  PLAN.md                         # architecture, build order, environment notes
+```
+
+## Prerequisites
+
+- [.NET SDK 10](https://dotnet.microsoft.com/download) (LTS). Check with `dotnet --version`.
+- A Google Cloud project with the Drive API enabled and OAuth credentials (set up as part of Core, step 2 of the plan — not yet built).
+
+## Status
+
+Solution and project scaffolding are in place (`McpGoogleDrive.slnx`, all four projects + tests, builds clean). Drive access, MCP tools, and hosting wiring are not yet implemented — see [docs/PLAN.md](docs/PLAN.md) for the current step.
