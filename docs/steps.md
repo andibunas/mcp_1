@@ -44,7 +44,7 @@ Commit: `fccf73c`
 
 ## ✅ Step 3 — Core: MCP tool definitions
 
-Commit: (pending)
+Commit: `8969c1b`
 
 - Added the `ModelContextProtocol` SDK (v2.2.0) package to `Core`.
 - **Tools/DriveTools.cs**: static `[McpServerToolType]` class with four `[McpServerTool]`-attributed
