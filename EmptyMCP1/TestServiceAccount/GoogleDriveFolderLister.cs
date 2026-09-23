@@ -39,8 +39,8 @@ public class GoogleDriveFolderLister
             {
                 Console.WriteLine($"Name: {folder.Name}");
                 Console.WriteLine($"  ID: {folder.Id}");
-                Console.WriteLine($"  Created: {folder.CreatedTime}");
-                Console.WriteLine($"  Modified: {folder.ModifiedTime}");
+                Console.WriteLine($"  Created: {folder.CreatedTimeDateTimeOffset}");
+                Console.WriteLine($"  Modified: {folder.ModifiedTimeDateTimeOffset}");
                 if (folder.Owners?.Count > 0)
                 {
                     Console.WriteLine($"  Owner: {folder.Owners[0].DisplayName}");
