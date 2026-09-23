@@ -128,3 +128,26 @@ In the Inspector UI, choose transport "SSE" (or "Streamable HTTP") and enter the
 
 
 
+# Register MCP
+Yes — step 7, registering with Claude Code itself. Two options depending on which project:
+
+**Option A — ConsoleMCP (stdio, simplest)**
+No need to keep anything running yourself; Claude Code launches the process for you.
+```
+claude mcp add consolemcp -- dotnet run --project /Users/andibunas/Documents/GitHub-andibunas/mcp_1/EmptyMCP1/ConsoleMCP
+```
+Then restart/reload this session (or run `/mcp` to see it listed) and the `Echo` tool becomes available to me.
+
+**Option B — WebMCP (HTTP)**
+The server has to actually be running first, since Claude Code just connects to a URL:
+```
+dotnet run --project /Users/andibunas/Documents/GitHub-andibunas/mcp_1/EmptyMCP1/WebMCP
+```
+It'll listen on `http://localhost:5157` (from `launchSettings.json`). In another terminal:
+```
+claude mcp add --transport http webmcp http://localhost:5157/mcp
+```
+
+Either way, after adding, run `/mcp` in this session to confirm it connects and lists the `Echo` tool.
+
+For just trying things out, I'd go with ConsoleMCP (Option A) — no server to manage. Want me to run the `claude mcp add` command for one of them?

@@ -16,5 +16,8 @@ app.Run();
 public static class EchoTool
 {
     [McpServerTool, Description("Echoes the input back.")]
-    public static string Echo(string message) => $"Echo: {message}";
+    public static string Echo(string message) {
+        Console.WriteLine($"EchoTool.Echo called with message: {message}"); 
+        return $"Echo: {message}";
+    }
 }
