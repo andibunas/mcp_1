@@ -1,8 +1,10 @@
 using ModelContextProtocol.Server;
 using System.ComponentModel;
-using System.Text.Json;
+using WebMCP.OAuth;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddDataProtection();
+builder.Services.AddSingleton<TokenProtector>();
 builder.Services
     .AddMcpServer()
     .WithHttpTransport()
@@ -10,83 +12,21 @@ builder.Services
 
 var app = builder.Build();
 
-app.MapGet("/.well-known/oauth-protected-resource", () => { 
-    Console.WriteLine("Processing /.well-known/oauth-protected-resource"); // Log the request for debugging
-    return Results.Json(new {
-        resource = "http://localhost:5157/resource/",
-        authorization_servers = new[] { "http://localhost:5157/authservers/" },
-        bearer_methods_supported = new[] { "header" },
-        scopes_supported = new[] { "mcp:tools:read", "mcp:tools:write" }
-    });
-});
-
-const string baseUrl = "http://localhost:5157";
-const string issuer = baseUrl + "/authservers";
-app.MapGet("/.well-known/oauth-authorization-server/authservers", () =>  {
-    Console.WriteLine("Processing /.well-known/oauth-authorization-server/authservers"); // Log the request for debugging
-    return  Results.Json(new {
-        issuer,
-        authorization_endpoint = $"{issuer}/authorize",
-        token_endpoint = $"{issuer}/token",
-        registration_endpoint = $"{issuer}/register",
-        response_types_supported = new[] { "code" },
-        grant_types_supported = new[] { "authorization_code", "refresh_token" },
-        code_challenge_methods_supported = new[] { "S256" },
-        token_endpoint_auth_methods_supported = new[] { "none" },
-        scopes_supported = new[] { "mcp:tools:read", "mcp:tools:write" }
-    });
-});
-
-
-app.MapGet("/", () => { 
-    Console.WriteLine("Processing /"); // Log the request for debugging
-    return Results.Text("Hello, World!");
-});
-
-
-
-
-
 app.Use(async (context, next) =>
 {
-    // go throught the heaeders and log them for debugging
-
-    Console.WriteLine($"Incoming request: {context.Request.Method} {context.Request.Path} "); // Log the incoming request for debugging
-
-    // if (context.Request.Path == "/.well-known/oauth-protected-resource")
-    if (context.Request.Path != "/mcp")
-    {
-        await next();
-        return;
-    }
-
-
-    var authHeader = context.Request.Headers["Authorization"].FirstOrDefault();
-    
-    Console.WriteLine($"Authorization header: {authHeader}"); // Log the Authorization header for debugging 
-    if (authHeader?.StartsWith("Bearer ") != true)
-    {
-        Console.WriteLine("Authorization header missing or does not start with 'Bearer '"); // Log the missing or incorrect header
-        context.Response.StatusCode = 401;
-        context.Response.Headers.Append("WWW-Authenticate", 
-            "Bearer resource_metadata=\"http://localhost:5157/.well-known/oauth-protected-resource\"");
-        return;
-    }
-    
-    Console.WriteLine($"Extracted token: {authHeader.Substring("Bearer ".Length)}"); // Log the extracted token for debugging   
-    var token = authHeader.Substring("Bearer ".Length);
-    if (token != "your-secret-api-key")
-    {
-        context.Response.StatusCode = 401;
-        return;
-    }
-    
+    Console.WriteLine($"Incoming request: {context.Request.Method} {context.Request.Path} ");
     await next();
 });
 
+app.MapDiscoveryEndpoints();    // /.well-known/*
+app.MapRegisterEndpoint();      // POST /authservers/register
+app.MapAuthorizeEndpoints();    // GET/POST /authservers/authorize
+app.MapTokenEndpoint();         // POST /authservers/token
 
+app.MapGet("/", () => Results.Text("Hello, World!"));
 
-app.MapMcp("/mcp");
+app.UseMiddleware<BearerAuthMiddleware>();   // guards /mcp
+app.MapMcp(OAuthSettings.McpPath);
 
 app.Run();
 
