@@ -27,7 +27,13 @@ public static partial class AuthorizeEndpoint
         {
             if (!ctx.Request.HasFormContentType) return Results.BadRequest("Expected a form post.");
             var form = await ctx.Request.ReadFormAsync();
-            return Handle(ctx, protector, key => form[key].ToString(), form["credential"].ToString());
+            return Handle(ctx, 
+                        protector, 
+                        key => {  
+                            Console.WriteLine($"Form key: {key}, value: {form[key]}");
+                            return form[key].ToString(); 
+                            }, 
+                        form["credential"].ToString());
         });
     }
 

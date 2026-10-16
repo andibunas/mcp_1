@@ -14,7 +14,7 @@ var app = builder.Build();
 
 app.Use(async (context, next) =>
 {
-    Console.WriteLine($"Incoming request: {context.Request.Method} {context.Request.Path} ");
+    Console.WriteLine($"Incoming request ====>>>>: {context.Request.Method} {context.Request.Path} ");
     await next();
 });
 
