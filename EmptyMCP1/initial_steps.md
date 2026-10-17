@@ -82,7 +82,7 @@ builder.Services
     .WithToolsFromAssembly();
 
 var app = builder.Build();
-app.MapMcp();   // exposes the MCP endpoint, e.g. /mcp
+app.MapMcp();   // exposes the MCP endpoint at /
 
 app.Run();
 
@@ -109,14 +109,14 @@ then in another terminal:
 ```
 npx @modelcontextprotocol/inspector
 ```
-In the Inspector UI, choose transport "SSE" (or "Streamable HTTP") and enter the URL your app logged on startup, e.g. `http://localhost:5000/mcp`.
+In the Inspector UI, choose transport "SSE" (or "Streamable HTTP") and enter the URL your app logged on startup, e.g. `http://localhost:5000`.
 
 **7. Register it with a real MCP client** — instead of pointing config at a `dotnet run --project` command, point it at the URL:
 ```json
 {
   "mcpServers": {
     "EmptyMCP1": {
-      "url": "http://localhost:5000/mcp"
+      "url": "http://localhost:5000"
     }
   }
 }
@@ -145,7 +145,7 @@ dotnet run --project /Users/andibunas/Documents/GitHub-andibunas/mcp_1/EmptyMCP1
 ```
 It'll listen on `http://localhost:5157` (from `launchSettings.json`). In another terminal:
 ```
-claude mcp add --transport http webmcp http://localhost:5157/mcp
+claude mcp add --transport http webmcp http://localhost:5157
 ```
 
 Either way, after adding, run `/mcp` in this session to confirm it connects and lists the `Echo` tool.

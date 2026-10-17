@@ -4,7 +4,7 @@ How the WebMCP server works, how a client authenticates to it, and the pitfalls 
 
 ## 1. What the server is
 
-An ASP.NET Core (net10.0) MCP server using `ModelContextProtocol.AspNetCore` 2.2.0, exposing one tool (`echo`) over the **Streamable HTTP** transport at `/mcp`. It is protected by a custom OAuth 2.1 flow where the "login" is the user pasting a **Google service account JSON key** into a web page.
+An ASP.NET Core (net10.0) MCP server using `ModelContextProtocol.AspNetCore` 2.2.0, exposing one tool (`echo`) over the **Streamable HTTP** transport at `/`. It is protected by a custom OAuth 2.1 flow where the "login" is the user pasting a **Google service account JSON key** into a web page.
 
 | Piece | Where |
 |---|---|
@@ -15,8 +15,8 @@ An ASP.NET Core (net10.0) MCP server using `ModelContextProtocol.AspNetCore` 2.2
 ## 2. The MCP part
 
 - `AddMcpServer().WithHttpTransport().WithToolsFromAssembly()` registers the SDK and discovers `[McpServerToolType]` classes.
-- `app.MapMcp("/mcp")` exposes the endpoint. The pattern argument sets the sub-path (the default is the root).
-- Client calls are JSON-RPC 2.0 over `POST /mcp`.
+- `app.MapMcp("/")` exposes the endpoint at the root.
+- Client calls are JSON-RPC 2.0 over `POST /`.
 
 Common request headers:
 
@@ -51,30 +51,30 @@ SDK 2.2.0 defaults to **stateless** mode (`HttpServerTransportOptions.SessionMod
 
 ## 3. OAuth flow
 
-`initialize` is blocked like every other call: **every** request to `/mcp` needs a valid token, and the 401 on the first unauthenticated call is what starts the flow. Only discovery and the authorization-server endpoints stay open.
+`initialize` is blocked like every other call: **every** request to the MCP endpoint (`/`) needs a valid token, and the 401 on the first unauthenticated call is what starts the flow. Only discovery and the authorization-server endpoints stay open.
 
 ```
 Client                                   WebMCP
-  | POST /mcp (no token)  ---------------> 401 + WWW-Authenticate: Bearer resource_metadata="<url>"
-  | GET  /.well-known/oauth-protected-resource/mcp  -> { resource, authorization_servers }
-  | GET  /.well-known/oauth-authorization-server/authservers -> { endpoints, PKCE S256 ... }
-  | POST /authservers/register ----------> client_id
-  | open browser: GET /authservers/authorize?... -> page: paste service account JSON
-  |                                      POST /authservers/authorize -> 302 redirect_uri?code=...&state=...
-  | POST /authservers/token (code + code_verifier) -> access_token, refresh_token
-  | POST /mcp  Authorization: Bearer <access_token>  -> works
+  | POST / (no token)  ---------------> 401 + WWW-Authenticate: Bearer resource_metadata="<url>"
+  | GET  /.well-known/oauth-protected-resource  -> { resource, authorization_servers }
+  | GET  /.well-known/oauth-authorization-server -> { endpoints, PKCE S256 ... }
+  | POST /register ----------> client_id
+  | open browser: GET /authorize?... -> page: paste service account JSON
+  |                                      POST /authorize -> 302 redirect_uri?code=...&state=...
+  | POST /token (code + code_verifier) -> access_token, refresh_token
+  | POST /  Authorization: Bearer <access_token>  -> works
 ```
 
 ### Endpoints (all in `OAuth/`)
 
 | Step | Route | File | Notes |
 |---|---|---|---|
-| Protected resource metadata | `GET /.well-known/oauth-protected-resource[/mcp]` | `DiscoveryEndpoints.cs` | `resource` must equal the MCP URL (`http://localhost:5157/mcp`) |
-| Auth server metadata | `GET /.well-known/oauth-authorization-server/authservers` | `DiscoveryEndpoints.cs` | `issuer` must equal the `authorization_servers` entry **exactly** (no trailing slash difference) |
-| Dynamic Client Registration | `POST /authservers/register` | `RegisterEndpoint.cs` | validates redirect URIs; returns `client_id` (201) |
-| Authorize | `GET/POST /authservers/authorize` | `AuthorizeEndpoint.cs` | GET shows the form; POST validates the key and redirects with a code |
-| Token | `POST /authservers/token` | `TokenEndpoint.cs` | `authorization_code` (PKCE S256) and `refresh_token` grants |
-| Guard | middleware on `/mcp` | `BearerAuthMiddleware.cs` | decrypts the token, 401 with `WWW-Authenticate` on failure |
+| Protected resource metadata | `GET /.well-known/oauth-protected-resource` | `DiscoveryEndpoints.cs` | `resource` must equal the MCP URL (`http://localhost:5157`) |
+| Auth server metadata | `GET /.well-known/oauth-authorization-server` | `DiscoveryEndpoints.cs` | `issuer` must equal the `authorization_servers` entry **exactly** (no trailing slash difference) |
+| Dynamic Client Registration | `POST /register` | `RegisterEndpoint.cs` | validates redirect URIs; returns `client_id` (201) |
+| Authorize | `GET/POST /authorize` | `AuthorizeEndpoint.cs` | GET shows the form; POST validates the key and redirects with a code |
+| Token | `POST /token` | `TokenEndpoint.cs` | `authorization_code` (PKCE S256) and `refresh_token` grants |
+| Guard | middleware on `/` | `BearerAuthMiddleware.cs` | decrypts the token, 401 with `WWW-Authenticate` on failure |
 
 ### Authorization server metadata fields
 
@@ -91,7 +91,7 @@ There is no database or session store. The server hands out values that are **se
 | access token | the service account key | 1 h |
 | refresh token | client id, the service account key | 30 days |
 
-The client stores the access token and sends it in the header. Each `/mcp` request decrypts it. Tools read the key from `HttpContext.Items[OAuthSettings.CredentialItemKey]`.
+The client stores the access token and sends it in the header. Each MCP request decrypts it. Tools read the key from `HttpContext.Items[OAuthSettings.CredentialItemKey]`.
 
 Consequences:
 
@@ -127,9 +127,9 @@ Only `type, project_id, private_key_id, private_key, client_email, client_id, to
 
 | Symptom | Cause |
 |---|---|
-| `Protected resource http://localhost:5157/resource/ does not match expected http://localhost:5157` | `resource` in the metadata must be the MCP endpoint (`.../mcp`) |
+| `Protected resource http://localhost:5157/resource/ does not match expected http://localhost:5157` | `resource` in the metadata must be the MCP endpoint URL (`http://localhost:5157`) |
 | `Dynamic Client Registration rejected (HTTP 401)` | no `/register` endpoint, and the old middleware 401'd it |
-| Three `404/401` lookups for `oauth-authorization-server/authservers`, `openid-configuration/authservers`, `authservers/.well-known/openid-configuration` | the client's standard metadata discovery order; the first one must exist |
+| Three `404/401` lookups for `oauth-authorization-server`, `openid-configuration/authservers`, `authservers/.well-known/openid-configuration` | the client's standard metadata discovery order; the first one must exist |
 | No `Mcp-Session-Id` header | SDK 2.2.0 is stateless by default (section 2) |
 | Test server "worked" but showed old behaviour | an older instance still held port 5157 |
 
@@ -149,24 +149,24 @@ Put a middleware **above** the auth one:
 B=http://localhost:5157
 
 # 1. unauthenticated call: expect 401 + WWW-Authenticate
-curl -i -X POST $B/mcp -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' -d '{}'
+curl -i -X POST $B/ -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' -d '{}'
 
 # 2. register
-curl -s -X POST $B/authservers/register -H 'Content-Type: application/json' \
+curl -s -X POST $B/register -H 'Content-Type: application/json' \
   -d '{"redirect_uris":["http://localhost:9999/cb"],"client_name":"curl"}'
 
 # 3. open in a browser (needs a PKCE challenge = base64url(SHA256(verifier))):
-#    $B/authservers/authorize?response_type=code&client_id=<id>&redirect_uri=http://localhost:9999/cb
+#    $B/authorize?response_type=code&client_id=<id>&redirect_uri=http://localhost:9999/cb
 #         &code_challenge=<challenge>&code_challenge_method=S256&state=xyz
 #    paste the service account JSON, then copy `code` from the redirect URL
 
 # 4. exchange the code
-curl -s -X POST $B/authservers/token -d grant_type=authorization_code \
+curl -s -X POST $B/token -d grant_type=authorization_code \
   --data-urlencode code=<code> --data-urlencode client_id=<id> \
   --data-urlencode redirect_uri=http://localhost:9999/cb --data-urlencode code_verifier=<verifier>
 
 # 5. call the MCP server (steps: initialize, then tools/list, then tools/call)
-curl -s -X POST $B/mcp -H "Authorization: Bearer <access_token>" \
+curl -s -X POST $B/ -H "Authorization: Bearer <access_token>" \
   -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' \
   -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"t","version":"1"}}}'
 ```
@@ -177,7 +177,7 @@ The full flow was verified end to end with curl against a copy on port 5158, usi
 
 - `BaseUrl` and the port are hardcoded in `OAuthSettings.cs` (`http://localhost:5157`).
 - The Google Drive verification of the key is not implemented yet.
-- `/` (hello page) is unauthenticated; only `/mcp` is guarded.
+- The hello page was removed; only the MCP endpoint at `/` is guarded.
 - Scopes are advertised but not enforced.
 - Option A (not chosen) was to delegate to an external identity provider (Entra, Auth0, Keycloak) and validate its JWTs with `AddJwtBearer`. That is the production route; this custom flow suits the "user types a Google service account key" requirement.
 
