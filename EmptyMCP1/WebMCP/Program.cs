@@ -18,7 +18,11 @@ app.Use(async (context, next) =>
 
     foreach (var (name, value) in context.Request.Headers)
     {
-        Console.WriteLine($"[RequestLogging]   {name}: {value}");
+        var valueStr = value.ToString();
+        var displayValue = name == "Authorization" && valueStr.Length > 60
+            ? $"{valueStr.Substring(0, 50)}...{valueStr.Substring(valueStr.Length - 10)}"
+            : valueStr;
+        Console.WriteLine($"[RequestLogging]   {name}: {displayValue}");
     }
 
     // Log request body if present
@@ -55,7 +59,11 @@ app.Use(async (context, next) =>
             Console.WriteLine($"[RequestLogging] Response: << {context.Response.StatusCode} {context.Response.ContentType}");
             foreach (var (name, value) in context.Response.Headers)
             {
-                Console.WriteLine($"[RequestLogging]   < {name}: {value}");
+                var valueStr = value.ToString();
+                var displayValue = name == "Authorization" && valueStr.Length > 60
+                    ? $"{valueStr.Substring(0, 50)}...{valueStr.Substring(valueStr.Length - 10)}"
+                    : valueStr;
+                Console.WriteLine($"[RequestLogging]   < {name}: {displayValue}");
             }
 
             responseBuffer.Position = 0;
