@@ -51,7 +51,6 @@ public class TokenProtector(IDataProtectionProvider provider)
             Console.WriteLine($"[TokenProtector.TryUnprotect] Creating protector and unprotecting...");
             var protector = provider.CreateProtector(purpose).ToTimeLimitedDataProtector();
             var unprotected = protector.Unprotect(value);
-            Console.WriteLine($"[TokenProtector.TryUnprotect] Successfully unprotected: {unprotected}");
 
             payload = JsonSerializer.Deserialize<T>(unprotected);
             Console.WriteLine($"[TokenProtector.TryUnprotect] Successfully deserialized to {typeof(T).Name}: {payload}");
