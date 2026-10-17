@@ -27,7 +27,7 @@ public static class TokenEndpoint
             Console.WriteLine($"[TokenEndpoint] Form data received with grant_type: {form["grant_type"]}");
 
             var grantType = form["grant_type"].ToString();
-            Console.WriteLine($"[TokenEndpoint] Processing grant_type: {grantType}");
+            // Console.WriteLine($"[TokenEndpoint] Processing grant_type: {grantType}");
             var result = grantType switch
             {
                 "authorization_code" => AuthorizationCodeGrant(protector, form),

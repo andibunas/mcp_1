@@ -8,7 +8,7 @@ public class BearerAuthMiddleware(RequestDelegate next, TokenProtector protector
 {
     public async Task InvokeAsync(HttpContext context)
     {
-        Console.WriteLine($"[BearerAuthMiddleware] Processing request: {context.Request.Method} {context.Request.Path}");
+        // Console.WriteLine($"[BearerAuthMiddleware] Processing request: {context.Request.Method} {context.Request.Path}");
 
         if (!context.Request.Path.StartsWithSegments(OAuthSettings.McpPath))
         {
@@ -17,10 +17,10 @@ public class BearerAuthMiddleware(RequestDelegate next, TokenProtector protector
             return;
         }
 
-        Console.WriteLine("[BearerAuthMiddleware] Path is under /mcp, requiring bearer token");
+        // Console.WriteLine("[BearerAuthMiddleware] Path is under /mcp, requiring bearer token");
 
         var header = context.Request.Headers.Authorization.FirstOrDefault();
-        Console.WriteLine($"[BearerAuthMiddleware] Authorization header: {(header is null ? "(missing)" : "(present)")}");
+        // Console.WriteLine($"[BearerAuthMiddleware] Authorization header: {(header is null ? "(missing)" : "(present)")}");
 
         if (header is null || !header.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
         {

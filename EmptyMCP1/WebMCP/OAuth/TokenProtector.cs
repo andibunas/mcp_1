@@ -53,7 +53,7 @@ public class TokenProtector(IDataProtectionProvider provider)
             var unprotected = protector.Unprotect(value);
 
             payload = JsonSerializer.Deserialize<T>(unprotected);
-            Console.WriteLine($"[TokenProtector.TryUnprotect] Successfully deserialized to {typeof(T).Name}: {payload}");
+            // Console.WriteLine($"[TokenProtector.TryUnprotect] Successfully deserialized to {typeof(T).Name}: {payload}");
             return payload is not null;
         }
         catch (CryptographicException ex)

@@ -5,6 +5,7 @@ using WebMCP.OAuth;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddDataProtection();
+builder.Services.AddHttpContextAccessor();
 builder.Services.AddSingleton<TokenProtector>();
 builder.Services
     .AddMcpServer()
@@ -15,7 +16,8 @@ var app = builder.Build();
 
 app.Use(async (context, next) =>
 {
-    Console.WriteLine($"[RequestLogging] Incoming request ====>>>>: {context.Request.Method} {context.Request.Path} {context.Request.QueryString}");
+    Console.WriteLine($"====================== Starting =======================");
+    Console.WriteLine($"[RequestLogging] Incoming request : {context.Request.Method} {context.Request.Path} {context.Request.QueryString}");
     LogHelper.LogRequestHeaders(context);
     await LogHelper.LogRequestBodyAsync(context);
     Console.WriteLine($"[RequestLogging] ----- calling next() -----");
@@ -35,6 +37,7 @@ app.Use(async (context, next) =>
             LogHelper.LogResponseHeaders(context);
             await LogHelper.LogResponseBodyAsync(responseBuffer, originalBody);
             context.Response.Body = originalBody;
+            Console.WriteLine($"====================== DONE =======================");
         }
     }
 });
