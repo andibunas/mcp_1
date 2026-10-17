@@ -180,3 +180,16 @@ The full flow was verified end to end with curl against a copy on port 5158, usi
 - `/` (hello page) is unauthenticated; only `/mcp` is guarded.
 - Scopes are advertised but not enforced.
 - Option A (not chosen) was to delegate to an external identity provider (Entra, Auth0, Keycloak) and validate its JWTs with `AddJwtBearer`. That is the production route; this custom flow suits the "user types a Google service account key" requirement.
+
+
+
+
+
+
+```
+all of that is overkill for this flow.   There is no real code exchange needed for the service account since the user will just provide the actual string needed for the token.
+I need the following changes:
+- rename the oauth to fullOAuth and make a copy of the current program file in that folder as a reference.
+- create a new simpleAuth folder and create very simple flow that just asks the user to enter the token value to verify it and the client can use it. and change program.cs to use this new flow.   I don't need the signing and checking flow besides a simple non empty pattern or maybe a basic pattern of the 
+
+```

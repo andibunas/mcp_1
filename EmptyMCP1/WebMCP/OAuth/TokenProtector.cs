@@ -23,22 +23,49 @@ public class TokenProtector(IDataProtectionProvider provider)
 
     public string Protect<T>(string purpose, T payload, TimeSpan lifetime)
     {
+        Console.WriteLine($"[TokenProtector.Protect] Starting - purpose={purpose}, lifetime={lifetime.TotalSeconds}s");
+        Console.WriteLine($"[TokenProtector.Protect] Payload type: {typeof(T).Name}, payload={payload}");
         var protector = provider.CreateProtector(purpose).ToTimeLimitedDataProtector();
-        return protector.Protect(JsonSerializer.Serialize(payload), lifetime);
+        var serialized = JsonSerializer.Serialize(payload);
+        Console.WriteLine($"[TokenProtector.Protect] Serialized payload: {serialized}");
+        var protected_value = protector.Protect(serialized, lifetime);
+        Console.WriteLine($"[TokenProtector.Protect] Protected value created (length={protected_value.Length})");
+        return protected_value;
     }
 
     /// <summary>Returns false when the value is malformed, tampered with, expired or for another purpose.</summary>
     public bool TryUnprotect<T>(string purpose, string? value, out T? payload) where T : class
     {
         payload = null;
-        if (string.IsNullOrEmpty(value)) return false;
+        Console.WriteLine($"[TokenProtector.TryUnprotect] Starting - purpose={purpose}, payload type={typeof(T).Name}");
+
+        if (string.IsNullOrEmpty(value))
+        {
+            Console.WriteLine($"[TokenProtector.TryUnprotect] Value is null or empty - returning false");
+            return false;
+        }
+
+        Console.WriteLine($"[TokenProtector.TryUnprotect] Value length: {value.Length}");
         try
         {
+            Console.WriteLine($"[TokenProtector.TryUnprotect] Creating protector and unprotecting...");
             var protector = provider.CreateProtector(purpose).ToTimeLimitedDataProtector();
-            payload = JsonSerializer.Deserialize<T>(protector.Unprotect(value));
+            var unprotected = protector.Unprotect(value);
+            Console.WriteLine($"[TokenProtector.TryUnprotect] Successfully unprotected: {unprotected}");
+
+            payload = JsonSerializer.Deserialize<T>(unprotected);
+            Console.WriteLine($"[TokenProtector.TryUnprotect] Successfully deserialized to {typeof(T).Name}: {payload}");
             return payload is not null;
         }
-        catch (CryptographicException) { return false; }
-        catch (JsonException) { return false; }
+        catch (CryptographicException ex)
+        {
+            Console.WriteLine($"[TokenProtector.TryUnprotect] CryptographicException: {ex.Message}");
+            return false;
+        }
+        catch (JsonException ex)
+        {
+            Console.WriteLine($"[TokenProtector.TryUnprotect] JsonException: {ex.Message}");
+            return false;
+        }
     }
 }

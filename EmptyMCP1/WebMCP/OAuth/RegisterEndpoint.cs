@@ -14,29 +14,55 @@ public static class RegisterEndpoint
     {
         app.MapPost($"{OAuthSettings.IssuerPath}/register", async (HttpContext ctx, TokenProtector protector) =>
         {
+            Console.WriteLine("[RegisterEndpoint] /register endpoint hit");
             JsonElement body;
-            try { body = await ctx.Request.ReadFromJsonAsync<JsonElement>(); }
-            catch (JsonException) { return Error("invalid_client_metadata", "Body must be JSON."); }
+            try
+            {
+                body = await ctx.Request.ReadFromJsonAsync<JsonElement>();
+                Console.WriteLine("[RegisterEndpoint] JSON body parsed successfully");
+            }
+            catch (JsonException)
+            {
+                Console.WriteLine("[RegisterEndpoint] Failed to parse JSON body");
+                return Error("invalid_client_metadata", "Body must be JSON.");
+            }
 
+            Console.WriteLine($"[RegisterEndpoint] Body kind: {body.ValueKind}");
             if (body.ValueKind != JsonValueKind.Object
                 || !body.TryGetProperty("redirect_uris", out var uris)
-                || uris.ValueKind != JsonValueKind.Array
-                || uris.GetArrayLength() is 0 or > 10)
+                || uris.ValueKind != JsonValueKind.Array)
+            {
+                Console.WriteLine("[RegisterEndpoint] Invalid body structure - must be object with redirect_uris array");
                 return Error("invalid_redirect_uri", "redirect_uris must be a non-empty array.");
+            }
+
+            var uriCount = uris.GetArrayLength();
+            Console.WriteLine($"[RegisterEndpoint] redirect_uris array length: {uriCount}");
+            if (uriCount is 0 or > 10)
+            {
+                Console.WriteLine($"[RegisterEndpoint] Invalid redirect_uris count - must be 1-10, got {uriCount}");
+                return Error("invalid_redirect_uri", "redirect_uris must be a non-empty array.");
+            }
 
             var redirectUris = new List<string>();
             foreach (var item in uris.EnumerateArray())
             {
                 var value = item.ValueKind == JsonValueKind.String ? item.GetString() : null;
-                if (!IsAllowedRedirectUri(value)) return Error("invalid_redirect_uri", $"Redirect URI not allowed: {value}");
+                Console.WriteLine($"[RegisterEndpoint] Validating redirect_uri: {value}");
+                if (!IsAllowedRedirectUri(value))
+                {
+                    Console.WriteLine($"[RegisterEndpoint] Redirect URI not allowed: {value}");
+                    return Error("invalid_redirect_uri", $"Redirect URI not allowed: {value}");
+                }
                 redirectUris.Add(value!);
             }
 
             string? name = body.TryGetProperty("client_name", out var n) && n.ValueKind == JsonValueKind.String ? n.GetString() : null;
+            Console.WriteLine($"[RegisterEndpoint] Client name: {name ?? "(none)"}");
 
             var clientId = protector.Protect(TokenProtector.ClientPurpose,
                 new ClientPayload([.. redirectUris], name), OAuthSettings.ClientIdLifetime);
-            Console.WriteLine($"Registered client '{name}' with {redirectUris.Count} redirect URI(s)");
+            Console.WriteLine($"[RegisterEndpoint] Registered client '{name}' with {redirectUris.Count} redirect URI(s)");
 
             return Results.Json(new
             {
@@ -50,15 +76,36 @@ public static class RegisterEndpoint
         });
     }
 
-    private static IResult Error(string error, string description) =>
-        Results.Json(new { error, error_description = description }, statusCode: StatusCodes.Status400BadRequest);
+    private static IResult Error(string error, string description)
+    {
+        Console.WriteLine($"[RegisterEndpoint.Error] {error}: {description}");
+        return Results.Json(new { error, error_description = description }, statusCode: StatusCodes.Status400BadRequest);
+    }
 
     private static bool IsAllowedRedirectUri(string? value)
     {
-        if (!Uri.TryCreate(value, UriKind.Absolute, out var uri) || uri.Fragment.Length > 0) return false;
-        if (BlockedSchemes.Contains(uri.Scheme)) return false;
-        // Plain http is only acceptable for loopback callbacks (native / desktop clients).
-        if (uri.Scheme == Uri.UriSchemeHttp) return uri.IsLoopback;
+        if (!Uri.TryCreate(value, UriKind.Absolute, out var uri))
+        {
+            Console.WriteLine($"[RegisterEndpoint.IsAllowedRedirectUri] Not a valid absolute URI: {value}");
+            return false;
+        }
+        if (uri.Fragment.Length > 0)
+        {
+            Console.WriteLine($"[RegisterEndpoint.IsAllowedRedirectUri] URI has fragment, not allowed");
+            return false;
+        }
+        if (BlockedSchemes.Contains(uri.Scheme))
+        {
+            Console.WriteLine($"[RegisterEndpoint.IsAllowedRedirectUri] Scheme '{uri.Scheme}' is blocked");
+            return false;
+        }
+        if (uri.Scheme == Uri.UriSchemeHttp)
+        {
+            var allowed = uri.IsLoopback;
+            Console.WriteLine($"[RegisterEndpoint.IsAllowedRedirectUri] HTTP scheme - loopback={uri.IsLoopback}, allowed={allowed}");
+            return allowed;
+        }
+        Console.WriteLine($"[RegisterEndpoint.IsAllowedRedirectUri] Scheme '{uri.Scheme}' is allowed");
         return true;
     }
 }

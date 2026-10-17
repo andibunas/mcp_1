@@ -14,8 +14,62 @@ var app = builder.Build();
 
 app.Use(async (context, next) =>
 {
-    Console.WriteLine($"Incoming request ====>>>>: {context.Request.Method} {context.Request.Path} ");
-    await next();
+    Console.WriteLine($"[RequestLogging] Incoming request ====>>>>: {context.Request.Method} {context.Request.Path} {context.Request.QueryString}");
+
+    foreach (var (name, value) in context.Request.Headers)
+    {
+        Console.WriteLine($"[RequestLogging]   {name}: {value}");
+    }
+
+    // Log request body if present
+    if (context.Request.ContentLength.HasValue && context.Request.ContentLength > 0)
+    {
+        Console.WriteLine($"[RequestLogging] Content-Length: {context.Request.ContentLength}");
+        context.Request.EnableBuffering();
+        using (var reader = new StreamReader(context.Request.Body, leaveOpen: true))
+        {
+            var body = await reader.ReadToEndAsync();
+            Console.WriteLine($"[RequestLogging] Request Body:\n{body}");
+            context.Request.Body.Position = 0;
+        }
+    }
+    else
+    {
+        Console.WriteLine($"[RequestLogging] No request body");
+    }
+
+    Console.WriteLine($"[RequestLogging] ----- calling next() -----");
+
+    // Capture response body
+    var originalBody = context.Response.Body;
+    using (var responseBuffer = new MemoryStream())
+    {
+        context.Response.Body = responseBuffer;
+
+        try
+        {
+            await next();
+        }
+        finally
+        {
+            Console.WriteLine($"[RequestLogging] Response: << {context.Response.StatusCode} {context.Response.ContentType}");
+            foreach (var (name, value) in context.Response.Headers)
+            {
+                Console.WriteLine($"[RequestLogging]   < {name}: {value}");
+            }
+
+            responseBuffer.Position = 0;
+            var responseBody = await new StreamReader(responseBuffer).ReadToEndAsync();
+            if (!string.IsNullOrEmpty(responseBody))
+            {
+                Console.WriteLine($"[RequestLogging] Response Body:\n{responseBody}");
+            }
+
+            responseBuffer.Position = 0;
+            await responseBuffer.CopyToAsync(originalBody);
+            context.Response.Body = originalBody;
+        }
+    }
 });
 
 app.MapDiscoveryEndpoints();    // /.well-known/*
