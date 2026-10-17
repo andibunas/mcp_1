@@ -37,20 +37,17 @@ app.Use(async (context, next) =>
             LogHelper.LogResponseHeaders(context);
             await LogHelper.LogResponseBodyAsync(responseBuffer, originalBody);
             context.Response.Body = originalBody;
-            Console.WriteLine($"====================== DONE =======================");
         }
     }
 });
 
 app.MapDiscoveryEndpoints();    // /.well-known/*
-app.MapRegisterEndpoint();      // POST /authservers/register
-app.MapAuthorizeEndpoints();    // GET/POST /authservers/authorize
-app.MapTokenEndpoint();         // POST /authservers/token
+app.MapRegisterEndpoint();      // POST /register
+app.MapAuthorizeEndpoints();    // GET/POST /authorize
+app.MapTokenEndpoint();         // POST /token
 
-app.MapGet("/", () => Results.Text("Hello, World!"));
-
-app.UseMiddleware<BearerAuthMiddleware>();   // guards /mcp
-app.MapMcp(OAuthSettings.McpPath);
+app.UseMiddleware<BearerAuthMiddleware>();   // guards the MCP endpoint at /
+app.MapMcp(OAuthSettings.McpPath);           // MCP endpoint at /
 
 app.Run();
 

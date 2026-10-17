@@ -1,7 +1,7 @@
 namespace WebMCP.OAuth;
 
 /// <summary>
-/// Step 6: guards /mcp. Unseals the access token and exposes the service account JSON
+/// Step 6: guards the MCP endpoint (root). Unseals the access token and exposes the service account JSON
 /// to tools through HttpContext.Items[OAuthSettings.CredentialItemKey].
 /// </summary>
 public class BearerAuthMiddleware(RequestDelegate next, TokenProtector protector)
@@ -10,14 +10,15 @@ public class BearerAuthMiddleware(RequestDelegate next, TokenProtector protector
     {
         // Console.WriteLine($"[BearerAuthMiddleware] Processing request: {context.Request.Method} {context.Request.Path}");
 
-        if (!context.Request.Path.StartsWithSegments(OAuthSettings.McpPath))
+        // Exact match: the MCP endpoint is the root, so StartsWithSegments("/") would match every path.
+        if (context.Request.Path.Value != OAuthSettings.McpPath)
         {
-            Console.WriteLine("[BearerAuthMiddleware] Path is not under /mcp, skipping auth");
+            Console.WriteLine("[BearerAuthMiddleware] Path is not the MCP endpoint, skipping auth");
             await next(context);
             return;
         }
 
-        // Console.WriteLine("[BearerAuthMiddleware] Path is under /mcp, requiring bearer token");
+        // Console.WriteLine("[BearerAuthMiddleware] Path is the MCP endpoint, requiring bearer token");
 
         var header = context.Request.Headers.Authorization.FirstOrDefault();
         // Console.WriteLine($"[BearerAuthMiddleware] Authorization header: {(header is null ? "(missing)" : "(present)")}");

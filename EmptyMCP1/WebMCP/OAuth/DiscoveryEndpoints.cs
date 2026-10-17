@@ -17,8 +17,6 @@ public static class DiscoveryEndpoints
             });
         }
 
-        // Path-suffixed form (RFC 9728) first, plain form as a fallback.
-        app.MapGet("/.well-known/oauth-protected-resource" + OAuthSettings.McpPath, ProtectedResource);
         app.MapGet("/.well-known/oauth-protected-resource", ProtectedResource);
 
         app.MapGet("/.well-known/oauth-authorization-server" + OAuthSettings.IssuerPath, () =>
