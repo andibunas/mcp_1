@@ -4,6 +4,7 @@ using Google.Apis.Auth.OAuth2;
 using Google.Apis.Drive.v3;
 using Google.Apis.Drive.v3.Data;
 using Google.Apis.Services;
+using log4net;
 using ModelContextProtocol.Server;
 using WebMCP.OAuth;
 using DriveFile = Google.Apis.Drive.v3.Data.File;
@@ -17,6 +18,8 @@ namespace WebMCP;
 [McpServerToolType]
 public static class DriveTools
 {
+    private static readonly ILog Log = LogManager.GetLogger(typeof(DriveTools));
+
     private const string FolderMimeType = "application/vnd.google-apps.folder";
     private const string FileFields = "nextPageToken, files(id, name, mimeType, parents, modifiedTime, size)";
 
@@ -26,11 +29,9 @@ public static class DriveTools
         "Pass a path such as \"/Reports/2026\" to list inside a folder by name, or a folder ID (no slashes) to list inside that folder.")]
     public static async Task<string> List(
         IHttpContextAccessor httpContextAccessor,
-        ILoggerFactory loggerFactory,
         [Description("Folder path (\"/Reports/2026\") or folder ID. Empty or \"/\" means the top level.")] string? folder = null)
     {
-        var logger = loggerFactory.CreateLogger("WebMCP.DriveTools");
-        logger.LogInformation("[DriveTools.List] folder='{Folder}'", folder);
+        Log.Info($"[DriveTools.List] folder='{folder}'");
 
         var json = httpContextAccessor.HttpContext?.Items[OAuthSettings.CredentialItemKey] as string
             ?? throw new InvalidOperationException("No service account credential is attached to this request.");

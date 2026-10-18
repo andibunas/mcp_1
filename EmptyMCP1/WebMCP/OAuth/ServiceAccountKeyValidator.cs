@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using log4net;
 
 namespace WebMCP.OAuth;
 
@@ -10,6 +11,8 @@ namespace WebMCP.OAuth;
 /// </summary>
 public static partial class ServiceAccountKeyValidator
 {
+    private static readonly ILog Log = LogManager.GetLogger(typeof(ServiceAccountKeyValidator));
+
     private const int MaxLength = 10_000;
     private static readonly string[] KeptFields =
         ["type", "project_id", "private_key_id", "private_key", "client_email", "client_id", "token_uri"];
@@ -21,123 +24,123 @@ public static partial class ServiceAccountKeyValidator
     private static partial Regex KeyIdPattern();
 
     /// <summary>On success, <paramref name="normalized"/> is compact JSON with only the fields needed to authenticate.</summary>
-    public static bool TryValidate(string? json, ILogger logger, out string normalized, out string? error)
+    public static bool TryValidate(string? json, out string normalized, out string? error)
     {
         normalized = "";
         error = null;
-        logger.LogInformation("[ServiceAccountKeyValidator.TryValidate] Starting validation");
+        Log.Info("[ServiceAccountKeyValidator.TryValidate] Starting validation");
 
         if (string.IsNullOrWhiteSpace(json))
         {
             error = "Paste the service account JSON key.";
-            logger.LogWarning("[ServiceAccountKeyValidator.TryValidate] Validation failed: {Error}", error);
+            Log.Warn($"[ServiceAccountKeyValidator.TryValidate] Validation failed: {error}");
             return false;
         }
 
-        logger.LogInformation("[ServiceAccountKeyValidator.TryValidate] JSON length: {Length} (max: {Max})", json.Length, MaxLength);
+        Log.Info($"[ServiceAccountKeyValidator.TryValidate] JSON length: {json.Length} (max: {MaxLength})");
         if (json.Length > MaxLength)
         {
             error = "That is too large to be a service account key.";
-            logger.LogWarning("[ServiceAccountKeyValidator.TryValidate] Validation failed: {Error}", error);
+            Log.Warn($"[ServiceAccountKeyValidator.TryValidate] Validation failed: {error}");
             return false;
         }
 
         Dictionary<string, string> fields = [];
         try
         {
-            logger.LogInformation("[ServiceAccountKeyValidator.TryValidate] Parsing JSON...");
+            Log.Info("[ServiceAccountKeyValidator.TryValidate] Parsing JSON...");
             using var doc = JsonDocument.Parse(json);
             if (doc.RootElement.ValueKind != JsonValueKind.Object)
             {
                 error = "Expected a JSON object.";
-                logger.LogWarning("[ServiceAccountKeyValidator.TryValidate] Validation failed: {Error}", error);
+                Log.Warn($"[ServiceAccountKeyValidator.TryValidate] Validation failed: {error}");
                 return false;
             }
 
-            logger.LogInformation("[ServiceAccountKeyValidator.TryValidate] Extracting required fields");
+            Log.Info("[ServiceAccountKeyValidator.TryValidate] Extracting required fields");
             foreach (var name in KeptFields)
             {
                 if (doc.RootElement.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String)
                 {
                     fields[name] = value.GetString()!;
-                    logger.LogInformation("[ServiceAccountKeyValidator.TryValidate] Found field: {Field}", name);
+                    Log.Info($"[ServiceAccountKeyValidator.TryValidate] Found field: {name}");
                 }
             }
         }
         catch (JsonException)
         {
             error = "That is not valid JSON.";
-            logger.LogWarning("[ServiceAccountKeyValidator.TryValidate] Validation failed: {Error}", error);
+            Log.Warn($"[ServiceAccountKeyValidator.TryValidate] Validation failed: {error}");
             return false;
         }
 
-        logger.LogInformation("[ServiceAccountKeyValidator.TryValidate] Extracted {Count} fields, checking required fields", fields.Count);
+        Log.Info($"[ServiceAccountKeyValidator.TryValidate] Extracted {fields.Count} fields, checking required fields");
         foreach (var required in new[] { "type", "project_id", "private_key_id", "private_key", "client_email" })
         {
             if (!fields.ContainsKey(required))
             {
                 error = $"Missing field \"{required}\".";
-                logger.LogWarning("[ServiceAccountKeyValidator.TryValidate] Validation failed: {Error}", error);
+                Log.Warn($"[ServiceAccountKeyValidator.TryValidate] Validation failed: {error}");
                 return false;
             }
         }
-        logger.LogInformation("[ServiceAccountKeyValidator.TryValidate] All required fields present");
+        Log.Info("[ServiceAccountKeyValidator.TryValidate] All required fields present");
 
-        logger.LogInformation("[ServiceAccountKeyValidator.TryValidate] Validating field formats...");
+        Log.Info("[ServiceAccountKeyValidator.TryValidate] Validating field formats...");
         if (fields["type"] != "service_account")
         {
             error = "\"type\" must be \"service_account\".";
-            logger.LogWarning("[ServiceAccountKeyValidator.TryValidate] Validation failed: {Error}", error);
+            Log.Warn($"[ServiceAccountKeyValidator.TryValidate] Validation failed: {error}");
             return false;
         }
 
         if (!EmailPattern().IsMatch(fields["client_email"]))
         {
             error = "\"client_email\" is not a service account address (…@….iam.gserviceaccount.com).";
-            logger.LogWarning("[ServiceAccountKeyValidator.TryValidate] Validation failed: {Error}", error);
+            Log.Warn($"[ServiceAccountKeyValidator.TryValidate] Validation failed: {error}");
             return false;
         }
 
         if (!KeyIdPattern().IsMatch(fields["private_key_id"]))
         {
             error = "\"private_key_id\" does not look like a Google key id.";
-            logger.LogWarning("[ServiceAccountKeyValidator.TryValidate] Validation failed: {Error}", error);
+            Log.Warn($"[ServiceAccountKeyValidator.TryValidate] Validation failed: {error}");
             return false;
         }
 
         if (fields.TryGetValue("token_uri", out var tokenUri) && tokenUri != "https://oauth2.googleapis.com/token")
         {
             error = "\"token_uri\" must be https://oauth2.googleapis.com/token.";
-            logger.LogWarning("[ServiceAccountKeyValidator.TryValidate] Validation failed: {Error}", error);
+            Log.Warn($"[ServiceAccountKeyValidator.TryValidate] Validation failed: {error}");
             return false;
         }
-        logger.LogInformation("[ServiceAccountKeyValidator.TryValidate] Field format validation passed");
+        Log.Info("[ServiceAccountKeyValidator.TryValidate] Field format validation passed");
 
-        logger.LogInformation("[ServiceAccountKeyValidator.TryValidate] Validating RSA key...");
+        Log.Info("[ServiceAccountKeyValidator.TryValidate] Validating RSA key...");
         try
         {
             using var rsa = RSA.Create();
             rsa.ImportFromPem(fields["private_key"]);
-            logger.LogInformation("[ServiceAccountKeyValidator.TryValidate] RSA key size: {KeySize} bits", rsa.KeySize);
+            Log.Info($"[ServiceAccountKeyValidator.TryValidate] RSA key size: {rsa.KeySize} bits");
             if (rsa.KeySize < 2048)
             {
                 error = "The private key is too small.";
-                logger.LogWarning("[ServiceAccountKeyValidator.TryValidate] Validation failed: {Error}", error);
+                Log.Warn($"[ServiceAccountKeyValidator.TryValidate] Validation failed: {error}");
                 return false;
             }
         }
         catch (Exception ex) when (ex is ArgumentException or CryptographicException)
         {
             error = "\"private_key\" is not a valid PEM private key.";
-            logger.LogWarning("[ServiceAccountKeyValidator.TryValidate] Validation failed: {Error} ({ExceptionType})", error, ex.GetType().Name);
+            Log.Warn($"[ServiceAccountKeyValidator.TryValidate] Validation failed: {error} ({ex.GetType().Name})");
             return false;
         }
-        logger.LogInformation("[ServiceAccountKeyValidator.TryValidate] RSA key validation passed");
+        Log.Info("[ServiceAccountKeyValidator.TryValidate] RSA key validation passed");
 
         // TODO(later): verify the key against Google Drive (e.g. a files.list call) before accepting it.
 
         normalized = JsonSerializer.Serialize(fields);
-        logger.LogInformation("[ServiceAccountKeyValidator.TryValidate] Validation successful, returning normalized JSON");
+        Log.Info("[ServiceAccountKeyValidator.TryValidate] Validation successful, returning normalized JSON");
         return true;
     }
 }

@@ -1,15 +1,17 @@
+using log4net;
+
 namespace WebMCP.OAuth;
 
 /// <summary>Step 1-2: the metadata documents a client reads after its first 401.</summary>
 public static class DiscoveryEndpoints
 {
+    private static readonly ILog Log = LogManager.GetLogger(typeof(DiscoveryEndpoints));
+
     public static void MapDiscoveryEndpoints(this WebApplication app)
     {
-        var logger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("WebMCP.OAuth.DiscoveryEndpoints");
-
         IResult ProtectedResource(HttpContext ctx)
         {
-            logger.LogInformation("Processing protected resource metadata");
+            Log.Info("Processing protected resource metadata");
             return Results.Json(new
             {
                 resource = OAuthSettings.GetResource(ctx),
@@ -23,7 +25,7 @@ public static class DiscoveryEndpoints
 
         app.MapGet("/.well-known/oauth-authorization-server" + OAuthSettings.IssuerPath, (HttpContext ctx) =>
         {
-            logger.LogInformation("Processing authorization server metadata");
+            Log.Info("Processing authorization server metadata");
             var issuer = OAuthSettings.GetIssuer(ctx);
             return Results.Json(new
             {

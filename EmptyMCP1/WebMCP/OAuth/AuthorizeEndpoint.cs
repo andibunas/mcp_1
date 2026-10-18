@@ -1,5 +1,6 @@
 using System.Text.Encodings.Web;
 using System.Text.RegularExpressions;
+using log4net;
 using Microsoft.AspNetCore.WebUtilities;
 
 namespace WebMCP.OAuth;
@@ -10,6 +11,8 @@ namespace WebMCP.OAuth;
 /// </summary>
 public static partial class AuthorizeEndpoint
 {
+    private static readonly ILog Log = LogManager.GetLogger(typeof(AuthorizeEndpoint));
+
     private static readonly string[] Passthrough =
         ["response_type", "client_id", "redirect_uri", "code_challenge", "code_challenge_method", "state", "scope"];
 
@@ -26,117 +29,115 @@ public static partial class AuthorizeEndpoint
     public static void MapAuthorizeEndpoints(this WebApplication app)
     {
         var path = $"{OAuthSettings.IssuerPath}/authorize";
-        var logger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("WebMCP.OAuth.AuthorizeEndpoint");
 
         app.MapGet($"{path}/key-help", () => Results.Content(KeyHelp, "text/html; charset=utf-8"));
 
         app.MapGet(path, (HttpContext ctx, TokenProtector protector) =>
         {
-            logger.LogInformation("[AuthorizeEndpoint.MapGet] /authorize GET endpoint hit");
-            return Handle(ctx, protector, logger, key => ctx.Request.Query[key].ToString(), credential: null);
+            Log.Info("[AuthorizeEndpoint.MapGet] /authorize GET endpoint hit");
+            return Handle(ctx, protector, key => ctx.Request.Query[key].ToString(), credential: null);
         });
 
         app.MapPost(path, async (HttpContext ctx, TokenProtector protector) =>
         {
-            logger.LogInformation("[AuthorizeEndpoint.MapPost] /authorize POST endpoint hit");
+            Log.Info("[AuthorizeEndpoint.MapPost] /authorize POST endpoint hit");
             if (!ctx.Request.HasFormContentType)
             {
-                logger.LogInformation("[AuthorizeEndpoint.MapPost] Request missing form content type");
+                Log.Info("[AuthorizeEndpoint.MapPost] Request missing form content type");
                 return Results.BadRequest("Expected a form post.");
             }
             var form = await ctx.Request.ReadFormAsync();
-            logger.LogInformation("[AuthorizeEndpoint.MapPost] Form data received with credential");
+            Log.Info("[AuthorizeEndpoint.MapPost] Form data received with credential");
             return Handle(ctx,
                         protector,
-                        logger,
                         // Log the key name only: the credential field holds the service account private key.
                         key => {
-                            logger.LogInformation("[AuthorizeEndpoint.MapPost] Form key: {Key}", key);
+                            Log.Info($"[AuthorizeEndpoint.MapPost] Form key: {key}");
                             return form[key].ToString();
                             },
                         form["credential"].ToString());
         });
     }
 
-    private static IResult Handle(HttpContext ctx, TokenProtector protector, ILogger logger, Func<string, string> get, string? credential)
+    private static IResult Handle(HttpContext ctx, TokenProtector protector, Func<string, string> get, string? credential)
     {
-        logger.LogInformation("[AuthorizeEndpoint.Handle] Starting authorization flow");
+        Log.Info("[AuthorizeEndpoint.Handle] Starting authorization flow");
         ctx.Response.Headers.CacheControl = "no-store";
         ctx.Response.Headers["X-Frame-Options"] = "DENY";
 
         // Until client_id and redirect_uri are verified we must not redirect anywhere.
         var redirectUri = get("redirect_uri");
-        logger.LogInformation("[AuthorizeEndpoint.Handle] redirect_uri: {RedirectUri}", redirectUri);
-        logger.LogInformation("[AuthorizeEndpoint.Handle] Attempting to unprotect client_id");
+        Log.Info($"[AuthorizeEndpoint.Handle] redirect_uri: {redirectUri}");
+        Log.Info("[AuthorizeEndpoint.Handle] Attempting to unprotect client_id");
 
         if (!protector.TryUnprotect<ClientPayload>(TokenProtector.ClientPurpose, get("client_id"), out var client))
         {
-            logger.LogWarning("[AuthorizeEndpoint.Handle] Failed to unprotect client_id");
+            Log.Warn("[AuthorizeEndpoint.Handle] Failed to unprotect client_id");
             return Results.Text("Unknown client or redirect URI. Register the client again.", statusCode: 400);
         }
 
-        logger.LogInformation("[AuthorizeEndpoint.Handle] Client unprotected, checking redirect_uri in allowed list: {RedirectUris}", string.Join(", ", client!.RedirectUris));
+        Log.Info($"[AuthorizeEndpoint.Handle] Client unprotected, checking redirect_uri in allowed list: {string.Join(", ", client!.RedirectUris)}");
         if (!client!.RedirectUris.Contains(redirectUri))
         {
-            logger.LogWarning("[AuthorizeEndpoint.Handle] redirect_uri not in client's allowed list");
+            Log.Warn("[AuthorizeEndpoint.Handle] redirect_uri not in client's allowed list");
             return Results.Text("Unknown client or redirect URI. Register the client again.", statusCode: 400);
         }
-        logger.LogInformation("[AuthorizeEndpoint.Handle] Client and redirect_uri verified");
+        Log.Info("[AuthorizeEndpoint.Handle] Client and redirect_uri verified");
 
         var state = get("state");
-        logger.LogInformation("[AuthorizeEndpoint.Handle] state: {State}", state);
+        Log.Info($"[AuthorizeEndpoint.Handle] state: {state}");
         IResult Fail(string error)
         {
-            logger.LogWarning("[AuthorizeEndpoint.Handle] Failing with error: {Error}", error);
-            return Redirect(logger, redirectUri, ("error", error), ("state", state));
+            Log.Warn($"[AuthorizeEndpoint.Handle] Failing with error: {error}");
+            return Redirect(redirectUri, ("error", error), ("state", state));
         }
 
         var responseType = get("response_type");
-        logger.LogInformation("[AuthorizeEndpoint.Handle] response_type: {ResponseType}", responseType);
+        Log.Info($"[AuthorizeEndpoint.Handle] response_type: {responseType}");
         if (responseType != "code") return Fail("unsupported_response_type");
 
         var challengeMethod = get("code_challenge_method");
         var codeChallenge = get("code_challenge");
-        logger.LogInformation("[AuthorizeEndpoint.Handle] code_challenge_method: {Method}, code_challenge: {Challenge}", challengeMethod, codeChallenge);
+        Log.Info($"[AuthorizeEndpoint.Handle] code_challenge_method: {challengeMethod}, code_challenge: {codeChallenge}");
         if (challengeMethod != "S256" || !ChallengePattern().IsMatch(codeChallenge))
         {
-            logger.LogWarning("[AuthorizeEndpoint.Handle] Challenge validation failed");
+            Log.Warn("[AuthorizeEndpoint.Handle] Challenge validation failed");
             return Fail("invalid_request");
         }
-        logger.LogInformation("[AuthorizeEndpoint.Handle] Challenge validation passed");
+        Log.Info("[AuthorizeEndpoint.Handle] Challenge validation passed");
 
         if (credential is null)
         {
-            logger.LogInformation("[AuthorizeEndpoint.Handle] No credential provided, showing authorization page");
+            Log.Info("[AuthorizeEndpoint.Handle] No credential provided, showing authorization page");
             return Page(get, client.ClientName, error: null);
         }
 
-        logger.LogInformation("[AuthorizeEndpoint.Handle] Validating service account key");
-        if (!ServiceAccountKeyValidator.TryValidate(credential, logger, out var normalized, out var error))
+        Log.Info("[AuthorizeEndpoint.Handle] Validating service account key");
+        if (!ServiceAccountKeyValidator.TryValidate(credential, out var normalized, out var error))
         {
-            logger.LogWarning("[AuthorizeEndpoint.Handle] Service account validation failed: {Error}", error);
+            Log.Warn($"[AuthorizeEndpoint.Handle] Service account validation failed: {error}");
             return Page(get, client.ClientName, error);
         }
-        logger.LogInformation("[AuthorizeEndpoint.Handle] Service account key validated successfully");
+        Log.Info("[AuthorizeEndpoint.Handle] Service account key validated successfully");
 
         var code = protector.Protect(TokenProtector.CodePurpose,
             new CodePayload(get("client_id"), redirectUri, codeChallenge, normalized),
             OAuthSettings.CodeLifetime);
 
-        logger.LogInformation("[AuthorizeEndpoint.Handle] Authorization code issued, redirecting");
-        return Redirect(logger, redirectUri, ("code", code), ("state", state));
+        Log.Info("[AuthorizeEndpoint.Handle] Authorization code issued, redirecting");
+        return Redirect(redirectUri, ("code", code), ("state", state));
     }
 
-    private static IResult Redirect(ILogger logger, string redirectUri, params (string Key, string Value)[] query)
+    private static IResult Redirect(string redirectUri, params (string Key, string Value)[] query)
     {
         var url = redirectUri;
         foreach (var (key, value) in query)
             if (!string.IsNullOrEmpty(value))
             {
                 url = QueryHelpers.AddQueryString(url, key, value);
-                logger.LogInformation("[AuthorizeEndpoint.Redirect] Adding query param: {Key}={Value}", key, value);
+                Log.Info($"[AuthorizeEndpoint.Redirect] Adding query param: {key}={value}");
             }
-        logger.LogInformation("[AuthorizeEndpoint.Redirect] Final redirect URL: {Url}", url);
+        Log.Info($"[AuthorizeEndpoint.Redirect] Final redirect URL: {url}");
         return Results.Redirect(url);
     }
 

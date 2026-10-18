@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text.Json;
+using log4net;
 using Microsoft.AspNetCore.DataProtection;
 
 namespace WebMCP.OAuth;
@@ -14,8 +15,10 @@ public record RefreshPayload(string ClientId, string Credential);
 /// Seals payloads into expiring, tamper-proof strings using ASP.NET Data Protection.
 /// Each purpose is isolated, so a code can't be presented as an access token.
 /// </summary>
-public class TokenProtector(IDataProtectionProvider provider, ILogger<TokenProtector> logger)
+public class TokenProtector(IDataProtectionProvider provider)
 {
+    private static readonly ILog Log = LogManager.GetLogger(typeof(TokenProtector));
+
     public const string ClientPurpose = "mcp.client";
     public const string CodePurpose = "mcp.code";
     public const string AccessPurpose = "mcp.access";
@@ -24,12 +27,12 @@ public class TokenProtector(IDataProtectionProvider provider, ILogger<TokenProte
     // Payloads are not logged: they carry the service account private key.
     public string Protect<T>(string purpose, T payload, TimeSpan lifetime)
     {
-        logger.LogInformation("[TokenProtector.Protect] Starting - purpose={Purpose}, lifetime={Lifetime}s", purpose, lifetime.TotalSeconds);
-        logger.LogInformation("[TokenProtector.Protect] Payload type: {PayloadType}", typeof(T).Name);
+        Log.Info($"[TokenProtector.Protect] Starting - purpose={purpose}, lifetime={lifetime.TotalSeconds}s");
+        Log.Info($"[TokenProtector.Protect] Payload type: {typeof(T).Name}");
         var protector = provider.CreateProtector(purpose).ToTimeLimitedDataProtector();
         var serialized = JsonSerializer.Serialize(payload);
         var protected_value = protector.Protect(serialized, lifetime);
-        logger.LogInformation("[TokenProtector.Protect] Protected value created (length={Length})", protected_value.Length);
+        Log.Info($"[TokenProtector.Protect] Protected value created (length={protected_value.Length})");
         return protected_value;
     }
 
@@ -37,18 +40,18 @@ public class TokenProtector(IDataProtectionProvider provider, ILogger<TokenProte
     public bool TryUnprotect<T>(string purpose, string? value, out T? payload) where T : class
     {
         payload = null;
-        logger.LogInformation("[TokenProtector.TryUnprotect] Starting - purpose={Purpose}, payload type={PayloadType}", purpose, typeof(T).Name);
+        Log.Info($"[TokenProtector.TryUnprotect] Starting - purpose={purpose}, payload type={typeof(T).Name}");
 
         if (string.IsNullOrEmpty(value))
         {
-            logger.LogWarning("[TokenProtector.TryUnprotect] Value is null or empty - returning false");
+            Log.Warn("[TokenProtector.TryUnprotect] Value is null or empty - returning false");
             return false;
         }
 
-        logger.LogInformation("[TokenProtector.TryUnprotect] Value length: {Length}", value.Length);
+        Log.Info($"[TokenProtector.TryUnprotect] Value length: {value.Length}");
         try
         {
-            logger.LogInformation("[TokenProtector.TryUnprotect] Creating protector and unprotecting...");
+            Log.Info("[TokenProtector.TryUnprotect] Creating protector and unprotecting...");
             var protector = provider.CreateProtector(purpose).ToTimeLimitedDataProtector();
             var unprotected = protector.Unprotect(value);
 
@@ -57,12 +60,12 @@ public class TokenProtector(IDataProtectionProvider provider, ILogger<TokenProte
         }
         catch (CryptographicException ex)
         {
-            logger.LogWarning("[TokenProtector.TryUnprotect] CryptographicException: {Message}", ex.Message);
+            Log.Warn($"[TokenProtector.TryUnprotect] CryptographicException: {ex.Message}");
             return false;
         }
         catch (JsonException ex)
         {
-            logger.LogWarning("[TokenProtector.TryUnprotect] JsonException: {Message}", ex.Message);
+            Log.Warn($"[TokenProtector.TryUnprotect] JsonException: {ex.Message}");
             return false;
         }
     }
