@@ -8,9 +8,12 @@
 
   <ItemGroup>
     <None Include="OAuth/*.html" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="log4net.config" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="log4net" Version="3.5.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Log4Net.AspNetCore" Version="10.0.0" />
     <PackageReference Include="ModelContextProtocol.AspNetCore" Version="2.2.0" />
     <PackageReference Include="Google.Apis.Drive.v3" Version="1.69.0.3674" />
   </ItemGroup>

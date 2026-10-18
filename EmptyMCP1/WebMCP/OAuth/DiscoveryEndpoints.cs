@@ -5,9 +5,11 @@ public static class DiscoveryEndpoints
 {
     public static void MapDiscoveryEndpoints(this WebApplication app)
     {
+        var logger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("WebMCP.OAuth.DiscoveryEndpoints");
+
         IResult ProtectedResource(HttpContext ctx)
         {
-            Console.WriteLine("Processing protected resource metadata");
+            logger.LogInformation("Processing protected resource metadata");
             return Results.Json(new
             {
                 resource = OAuthSettings.GetResource(ctx),
@@ -21,7 +23,7 @@ public static class DiscoveryEndpoints
 
         app.MapGet("/.well-known/oauth-authorization-server" + OAuthSettings.IssuerPath, (HttpContext ctx) =>
         {
-            Console.WriteLine("Processing authorization server metadata");
+            logger.LogInformation("Processing authorization server metadata");
             var issuer = OAuthSettings.GetIssuer(ctx);
             return Results.Json(new
             {

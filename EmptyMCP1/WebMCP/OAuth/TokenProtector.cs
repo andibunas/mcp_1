@@ -14,22 +14,22 @@ public record RefreshPayload(string ClientId, string Credential);
 /// Seals payloads into expiring, tamper-proof strings using ASP.NET Data Protection.
 /// Each purpose is isolated, so a code can't be presented as an access token.
 /// </summary>
-public class TokenProtector(IDataProtectionProvider provider)
+public class TokenProtector(IDataProtectionProvider provider, ILogger<TokenProtector> logger)
 {
     public const string ClientPurpose = "mcp.client";
     public const string CodePurpose = "mcp.code";
     public const string AccessPurpose = "mcp.access";
     public const string RefreshPurpose = "mcp.refresh";
 
+    // Payloads are not logged: they carry the service account private key.
     public string Protect<T>(string purpose, T payload, TimeSpan lifetime)
     {
-        Console.WriteLine($"[TokenProtector.Protect] Starting - purpose={purpose}, lifetime={lifetime.TotalSeconds}s");
-        Console.WriteLine($"[TokenProtector.Protect] Payload type: {typeof(T).Name}, payload={payload}");
+        logger.LogInformation("[TokenProtector.Protect] Starting - purpose={Purpose}, lifetime={Lifetime}s", purpose, lifetime.TotalSeconds);
+        logger.LogInformation("[TokenProtector.Protect] Payload type: {PayloadType}", typeof(T).Name);
         var protector = provider.CreateProtector(purpose).ToTimeLimitedDataProtector();
         var serialized = JsonSerializer.Serialize(payload);
-        Console.WriteLine($"[TokenProtector.Protect] Serialized payload: {serialized}");
         var protected_value = protector.Protect(serialized, lifetime);
-        Console.WriteLine($"[TokenProtector.Protect] Protected value created (length={protected_value.Length})");
+        logger.LogInformation("[TokenProtector.Protect] Protected value created (length={Length})", protected_value.Length);
         return protected_value;
     }
 
@@ -37,33 +37,32 @@ public class TokenProtector(IDataProtectionProvider provider)
     public bool TryUnprotect<T>(string purpose, string? value, out T? payload) where T : class
     {
         payload = null;
-        Console.WriteLine($"[TokenProtector.TryUnprotect] Starting - purpose={purpose}, payload type={typeof(T).Name}");
+        logger.LogInformation("[TokenProtector.TryUnprotect] Starting - purpose={Purpose}, payload type={PayloadType}", purpose, typeof(T).Name);
 
         if (string.IsNullOrEmpty(value))
         {
-            Console.WriteLine($"[TokenProtector.TryUnprotect] Value is null or empty - returning false");
+            logger.LogWarning("[TokenProtector.TryUnprotect] Value is null or empty - returning false");
             return false;
         }
 
-        Console.WriteLine($"[TokenProtector.TryUnprotect] Value length: {value.Length}");
+        logger.LogInformation("[TokenProtector.TryUnprotect] Value length: {Length}", value.Length);
         try
         {
-            Console.WriteLine($"[TokenProtector.TryUnprotect] Creating protector and unprotecting...");
+            logger.LogInformation("[TokenProtector.TryUnprotect] Creating protector and unprotecting...");
             var protector = provider.CreateProtector(purpose).ToTimeLimitedDataProtector();
             var unprotected = protector.Unprotect(value);
 
             payload = JsonSerializer.Deserialize<T>(unprotected);
-            // Console.WriteLine($"[TokenProtector.TryUnprotect] Successfully deserialized to {typeof(T).Name}: {payload}");
             return payload is not null;
         }
         catch (CryptographicException ex)
         {
-            Console.WriteLine($"[TokenProtector.TryUnprotect] CryptographicException: {ex.Message}");
+            logger.LogWarning("[TokenProtector.TryUnprotect] CryptographicException: {Message}", ex.Message);
             return false;
         }
         catch (JsonException ex)
         {
-            Console.WriteLine($"[TokenProtector.TryUnprotect] JsonException: {ex.Message}");
+            logger.LogWarning("[TokenProtector.TryUnprotect] JsonException: {Message}", ex.Message);
             return false;
         }
     }

@@ -26,9 +26,11 @@ public static class DriveTools
         "Pass a path such as \"/Reports/2026\" to list inside a folder by name, or a folder ID (no slashes) to list inside that folder.")]
     public static async Task<string> List(
         IHttpContextAccessor httpContextAccessor,
+        ILoggerFactory loggerFactory,
         [Description("Folder path (\"/Reports/2026\") or folder ID. Empty or \"/\" means the top level.")] string? folder = null)
     {
-        Console.WriteLine($"[DriveTools.List] folder='{folder}'");
+        var logger = loggerFactory.CreateLogger("WebMCP.DriveTools");
+        logger.LogInformation("[DriveTools.List] folder='{Folder}'", folder);
 
         var json = httpContextAccessor.HttpContext?.Items[OAuthSettings.CredentialItemKey] as string
             ?? throw new InvalidOperationException("No service account credential is attached to this request.");

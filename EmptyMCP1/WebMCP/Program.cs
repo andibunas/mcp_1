@@ -6,6 +6,13 @@ using WebMCP.OAuth;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// log4net writes to the console and to <app folder>\logs\webmcp.log (see log4net.config)
+var logDir = Path.Combine(AppContext.BaseDirectory, "logs");
+Directory.CreateDirectory(logDir);
+log4net.GlobalContext.Properties["LogDir"] = logDir;
+builder.Logging.ClearProviders();   // replace the default console provider so each line is written once
+builder.Logging.AddLog4Net("log4net.config");
+
 // Behind a hosting proxy (TLS terminated upstream), take scheme and host from X-Forwarded-* so the
 // metadata advertises the public https URL. Locally there is no proxy and the request URL is used as-is.
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
@@ -28,11 +35,12 @@ app.UseForwardedHeaders();
 
 app.Use(async (context, next) =>
 {
-    Console.WriteLine($"====================== Starting =======================");
-    Console.WriteLine($"[RequestLogging] Incoming request : {context.Request.Method} {context.Request.Path} {context.Request.QueryString}");
-    LogHelper.LogRequestHeaders(context);
-    await LogHelper.LogRequestBodyAsync(context);
-    Console.WriteLine($"[RequestLogging] ----- calling next() -----");
+    var logger = app.Logger;
+    logger.LogInformation("====================== Starting =======================");
+    logger.LogInformation("[RequestLogging] Incoming request : {Method} {Path} {Query}", context.Request.Method, context.Request.Path, context.Request.QueryString);
+    LogHelper.LogRequestHeaders(context, logger);
+    await LogHelper.LogRequestBodyAsync(context, logger);
+    logger.LogInformation("[RequestLogging] ----- calling next() -----");
 
     var originalBody = context.Response.Body;
     using (var responseBuffer = new MemoryStream())
@@ -45,9 +53,9 @@ app.Use(async (context, next) =>
         }
         finally
         {
-            Console.WriteLine($"[RequestLogging] Response: << {context.Response.StatusCode} {context.Response.ContentType}");
-            LogHelper.LogResponseHeaders(context);
-            await LogHelper.LogResponseBodyAsync(responseBuffer, originalBody);
+            logger.LogInformation("[RequestLogging] Response: << {StatusCode} {ContentType}", context.Response.StatusCode, context.Response.ContentType);
+            LogHelper.LogResponseHeaders(context, logger);
+            await LogHelper.LogResponseBodyAsync(responseBuffer, originalBody, logger);
             context.Response.Body = originalBody;
         }
     }
@@ -67,8 +75,8 @@ app.Run();
 public static class EchoTool
 {
     [McpServerTool, Description("Echoes the input back.")]
-    public static string Echo(string message) {
-        Console.WriteLine($"EchoTool.Echo called with message: {message}"); 
+    public static string Echo(string message, ILogger<Program> logger) {
+        logger.LogInformation("EchoTool.Echo called with message: {Message}", message);
         return $"Echo: {message}";
     }
 }
