@@ -13,6 +13,13 @@ public static partial class AuthorizeEndpoint
     private static readonly string[] Passthrough =
         ["response_type", "client_id", "redirect_uri", "code_challenge", "code_challenge_method", "state", "scope"];
 
+    // Edit OAuth/authorize.html to change the page. It is copied next to the binary at build time.
+    private static readonly string Template =
+        File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "OAuth", "authorize.html"));
+
+    private static readonly string KeyHelp =
+        File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "OAuth", "key-help.html"));
+
     [GeneratedRegex(@"^[A-Za-z0-9_-]{43}$")]
     private static partial Regex ChallengePattern();
 
@@ -20,7 +27,9 @@ public static partial class AuthorizeEndpoint
     {
         var path = $"{OAuthSettings.IssuerPath}/authorize";
 
-        app.MapGet(path, (HttpContext ctx, TokenProtector protector) =>
+        app.MapGet($"{path}/key-help", () => Results.Content(KeyHelp, "text/html; charset=utf-8"));
+
+        app.MapGet(path,(HttpContext ctx, TokenProtector protector) =>
         {
             Console.WriteLine("[AuthorizeEndpoint.MapGet] /authorize GET endpoint hit");
             return Handle(ctx, protector, key => ctx.Request.Query[key].ToString(), credential: null);
@@ -136,28 +145,10 @@ public static partial class AuthorizeEndpoint
         var errorHtml = error is null ? "" : $"<p class=\"error\">{enc.Encode(error)}</p>";
         var who = string.IsNullOrEmpty(clientName) ? "An application" : enc.Encode(clientName);
 
-        var html = $$"""
-            <!doctype html>
-            <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-            <title>Authorize access</title>
-            <style>
-              body{font-family:system-ui,sans-serif;max-width:640px;margin:2rem auto;padding:0 1rem}
-              textarea{width:100%;height:16rem;font-family:ui-monospace,monospace;font-size:.8rem}
-              .error{color:#b00020}
-              button{padding:.5rem 1.2rem;margin-top:.8rem}
-            </style></head>
-            <body>
-              <h1>Authorize access</h1>
-              <p>{{who}} wants to use your Google service account through this MCP server.</p>
-              <p>Paste the full contents of the service account JSON key file.</p>
-              {{errorHtml}}
-              <form method="post">
-                {{hidden}}
-                <textarea name="credential" required spellcheck="false" autocomplete="off"></textarea>
-                <button type="submit">Authorize</button>
-              </form>
-            </body></html>
-            """;
+        var html = Template
+            .Replace("{{who}}", who)
+            .Replace("{{error}}", errorHtml)
+            .Replace("{{hidden}}", hidden);
         return Results.Content(html, "text/html; charset=utf-8", statusCode: error is null ? 200 : 400);
     }
 }

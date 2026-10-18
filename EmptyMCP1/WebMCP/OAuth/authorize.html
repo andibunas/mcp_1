@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Authorize access</title>
+  <style>
+    body{font-family:system-ui,sans-serif;max-width:640px;margin:2rem auto;padding:0 1rem}
+    textarea{width:100%;height:16rem;font-family:ui-monospace,monospace;font-size:.8rem}
+    .error{color:#b00020}
+    button{padding:.5rem 1.2rem;margin-top:.8rem}
+    .help{margin:.5rem 0 1rem}
+    .or{color:#666;margin:1rem 0 .3rem}
+  </style>
+</head>
+<body>
+  <h1>Authorize access</h1>
+  <p>{{who}} wants to use your Google service account through this MCP server.</p>
+  <p>Provide the service account JSON key file, either by choosing the file or by pasting its contents.</p>
+  <p class="help"><a href="/authorize/key-help" target="_blank" rel="noopener">How do I get the key file?</a></p>
+  {{error}}
+  <form method="post">
+    {{hidden}}
+    <label for="keyfile">Choose the key file</label><br>
+    <input type="file" id="keyfile" accept=".json,application/json">
+    <p class="or">or paste the contents below</p>
+    <textarea name="credential" id="credential" required spellcheck="false" autocomplete="off"></textarea>
+    <button type="submit">Authorize</button>
+  </form>
+  <script>
+    document.getElementById("keyfile").addEventListener("change", function (event) {
+      var file = event.target.files[0];
+      if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function () {
+        document.getElementById("credential").value = reader.result;
+      };
+      reader.readAsText(file);
+    });
+  </script>
+</body>
+</html>

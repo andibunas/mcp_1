@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>How to get a service account key</title>
+  <style>
+    body{font-family:system-ui,sans-serif;max-width:640px;margin:2rem auto;padding:0 1rem;line-height:1.5}
+    li{margin-bottom:.6rem}
+    .note{background:#fff8e1;border-left:4px solid #f0b400;padding:.5rem .8rem}
+  </style>
+</head>
+<body>
+  <h1>How to get a service account key</h1>
+  <p>The MCP server signs in to Google as a service account. You create that account once in Google Cloud and download its JSON key file.</p>
+  <ol>
+    <li>Open the <a href="https://console.cloud.google.com/" target="_blank" rel="noopener">Google Cloud Console</a> and select the project you want to use (or create one).</li>
+    <li>Enable the Google Drive API: go to <strong>APIs &amp; Services &gt; Library</strong>, search for <strong>Google Drive API</strong>, and click <strong>Enable</strong>.</li>
+    <li>Create the service account: go to <strong>IAM &amp; Admin &gt; Service Accounts</strong> and click <strong>Create service account</strong>. Give it a name and finish the steps. Granting it roles is optional for Drive access.</li>
+    <li>Create the key: open the new service account, go to the <strong>Keys</strong> tab, click <strong>Add key &gt; Create new key</strong>, choose <strong>JSON</strong>, and click <strong>Create</strong>. Your browser downloads the file.</li>
+    <li>Share your files with the service account: a service account can only see Drive files and folders that are shared with it. Copy its email address (it ends in <code>.iam.gserviceaccount.com</code>) and share the files or folders with it in Google Drive, as you would with a person.</li>
+    <li>Return to the authorization page and choose the downloaded file, or open it in a text editor and paste its contents.</li>
+  </ol>
+  <p class="note">The key file gives full access to whatever it is shared with. Keep it private, do not commit it to git, and delete your local copy once you no longer need it.</p>
+  <p><a href="javascript:history.back()">Back to authorization</a></p>
+</body>
+</html>
