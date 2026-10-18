@@ -2,14 +2,22 @@ namespace WebMCP.OAuth;
 
 public static class OAuthSettings
 {
-    public const string BaseUrl = "http://localhost:5157";
-
     public const string IssuerPath = "";
-    public const string Issuer = BaseUrl + IssuerPath;
-
     public const string McpPath = "/";
-    public const string Resource = BaseUrl;
-    public const string ProtectedResourceMetadataUrl = BaseUrl + "/.well-known/oauth-protected-resource";
+
+    /// <summary>
+    /// The public base URL the caller used to reach this server (e.g. http://localhost:5157 locally,
+    /// https://mcp1.bunasan.com when hosted). Forwarded headers are applied by UseForwardedHeaders in Program.cs.
+    /// </summary>
+    public static string GetBaseUrl(HttpContext ctx) =>
+        $"{ctx.Request.Scheme}://{ctx.Request.Host}{ctx.Request.PathBase}";
+
+    public static string GetIssuer(HttpContext ctx) => GetBaseUrl(ctx) + IssuerPath;
+
+    public static string GetResource(HttpContext ctx) => GetBaseUrl(ctx);
+
+    public static string GetProtectedResourceMetadataUrl(HttpContext ctx) =>
+        GetBaseUrl(ctx) + "/.well-known/oauth-protected-resource";
 
     public static readonly string[] Scopes = ["mcp:tools:read", "mcp:tools:write"];
 

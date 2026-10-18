@@ -1,9 +1,24 @@
+using log4net;
+using Microsoft.AspNetCore.HttpOverrides;
 using ModelContextProtocol.Server;
 using System.ComponentModel;
 using WebMCP;
 using WebMCP.OAuth;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// log4net writes to the console and to App_Data/Logs/application.log (see log4net.config)
+builder.Logging.ClearProviders();   // replace the default console provider so each line is written once
+builder.Logging.AddLog4Net("log4net.config");
+
+// Behind a hosting proxy (TLS terminated upstream), take scheme and host from X-Forwarded-* so the
+// metadata advertises the public https URL. Locally there is no proxy and the request URL is used as-is.
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost;
+    options.KnownIPNetworks.Clear();
+    options.KnownProxies.Clear();
+});
 builder.Services.AddDataProtection();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddSingleton<TokenProtector>();
@@ -14,13 +29,17 @@ builder.Services
 
 var app = builder.Build();
 
+app.UseForwardedHeaders();
+
+var requestLog = LogManager.GetLogger("WebMCP.RequestLogging");
+
 app.Use(async (context, next) =>
 {
-    Console.WriteLine($"====================== Starting =======================");
-    Console.WriteLine($"[RequestLogging] Incoming request : {context.Request.Method} {context.Request.Path} {context.Request.QueryString}");
+    requestLog.Info("====================== Starting =======================");
+    requestLog.Info($"Incoming request : {context.Request.Method} {context.Request.Path} {context.Request.QueryString}");
     LogHelper.LogRequestHeaders(context);
     await LogHelper.LogRequestBodyAsync(context);
-    Console.WriteLine($"[RequestLogging] ----- calling next() -----");
+    requestLog.Info("----- calling next() -----");
 
     var originalBody = context.Response.Body;
     using (var responseBuffer = new MemoryStream())
@@ -33,7 +52,7 @@ app.Use(async (context, next) =>
         }
         finally
         {
-            Console.WriteLine($"[RequestLogging] Response: << {context.Response.StatusCode} {context.Response.ContentType}");
+            requestLog.Info($"Response: << {context.Response.StatusCode} {context.Response.ContentType}");
             LogHelper.LogResponseHeaders(context);
             await LogHelper.LogResponseBodyAsync(responseBuffer, originalBody);
             context.Response.Body = originalBody;
@@ -54,9 +73,11 @@ app.Run();
 [McpServerToolType]
 public static class EchoTool
 {
+    private static readonly ILog Log = LogManager.GetLogger(typeof(EchoTool));
+
     [McpServerTool, Description("Echoes the input back.")]
     public static string Echo(string message) {
-        Console.WriteLine($"EchoTool.Echo called with message: {message}"); 
+        Log.Info($"EchoTool.Echo called with message: {message}");
         return $"Echo: {message}";
     }
 }

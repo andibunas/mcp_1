@@ -1,7 +1,11 @@
+using log4net;
+
 namespace WebMCP;
 
 public static class LogHelper
 {
+    private static readonly ILog Log = LogManager.GetLogger(typeof(LogHelper));
+
     private const int AuthHeaderTruncateThreshold = 60;
     private const int AuthHeaderDisplayStart = 50;
     private const int AuthHeaderDisplayEnd = 10;
@@ -18,7 +22,7 @@ public static class LogHelper
         foreach (var (name, value) in context.Request.Headers)
         {
             var displayValue = FormatHeaderValue(name, value.ToString());
-            Console.WriteLine($"[RequestLogging]   {name}: {displayValue}");
+            Log.Info($"  {name}: {displayValue}");
         }
     }
 
@@ -26,18 +30,18 @@ public static class LogHelper
     {
         if (context.Request.ContentLength.HasValue && context.Request.ContentLength > 0)
         {
-            Console.WriteLine($"[RequestLogging] Content-Length: {context.Request.ContentLength}");
+            Log.Info($"Content-Length: {context.Request.ContentLength}");
             context.Request.EnableBuffering();
             using (var reader = new StreamReader(context.Request.Body, leaveOpen: true))
             {
                 var body = await reader.ReadToEndAsync();
-                Console.WriteLine($"[RequestLogging] Request Body:\n{body}");
+                Log.Info($"Request Body:\n{body}");
                 context.Request.Body.Position = 0;
             }
         }
         else
         {
-            Console.WriteLine($"[RequestLogging] No request body");
+            Log.Info("No request body");
         }
     }
 
@@ -46,7 +50,7 @@ public static class LogHelper
         foreach (var (name, value) in context.Response.Headers)
         {
             var displayValue = FormatHeaderValue(name, value.ToString());
-            Console.WriteLine($"[RequestLogging]   < {name}: {displayValue}");
+            Log.Info($"  < {name}: {displayValue}");
         }
     }
 
@@ -56,7 +60,7 @@ public static class LogHelper
         var responseBody = await new StreamReader(responseBuffer).ReadToEndAsync();
         if (!string.IsNullOrEmpty(responseBody))
         {
-            Console.WriteLine($"[RequestLogging] Response Body:\n{responseBody}");
+            Log.Info($"Response Body:\n{responseBody}");
         }
 
         responseBuffer.Position = 0;
