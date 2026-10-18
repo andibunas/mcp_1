@@ -175,7 +175,7 @@ The full flow was verified end to end with curl against a copy on port 5158, usi
 
 ## 10. Known gaps and ideas
 
-- `BaseUrl` and the port are hardcoded in `OAuthSettings.cs` (`http://localhost:5157`).
+- The base URL is no longer hardcoded: `OAuthSettings.GetBaseUrl(ctx)` builds it from the request (scheme + host). Behind a proxy, `UseForwardedHeaders` in `Program.cs` takes scheme and host from `X-Forwarded-*`. The proxy must send those headers.
 - The Google Drive verification of the key is not implemented yet.
 - The hello page was removed; only the MCP endpoint at `/` is guarded.
 - Scopes are advertised but not enforced.

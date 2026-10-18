@@ -5,13 +5,13 @@ public static class DiscoveryEndpoints
 {
     public static void MapDiscoveryEndpoints(this WebApplication app)
     {
-        IResult ProtectedResource()
+        IResult ProtectedResource(HttpContext ctx)
         {
             Console.WriteLine("Processing protected resource metadata");
             return Results.Json(new
             {
-                resource = OAuthSettings.Resource,
-                authorization_servers = new[] { OAuthSettings.Issuer },
+                resource = OAuthSettings.GetResource(ctx),
+                authorization_servers = new[] { OAuthSettings.GetIssuer(ctx) },
                 bearer_methods_supported = new[] { "header" },
                 scopes_supported = OAuthSettings.Scopes
             });
@@ -19,15 +19,16 @@ public static class DiscoveryEndpoints
 
         app.MapGet("/.well-known/oauth-protected-resource", ProtectedResource);
 
-        app.MapGet("/.well-known/oauth-authorization-server" + OAuthSettings.IssuerPath, () =>
+        app.MapGet("/.well-known/oauth-authorization-server" + OAuthSettings.IssuerPath, (HttpContext ctx) =>
         {
             Console.WriteLine("Processing authorization server metadata");
+            var issuer = OAuthSettings.GetIssuer(ctx);
             return Results.Json(new
             {
-                issuer = OAuthSettings.Issuer,
-                authorization_endpoint = $"{OAuthSettings.Issuer}/authorize",
-                token_endpoint = $"{OAuthSettings.Issuer}/token",
-                registration_endpoint = $"{OAuthSettings.Issuer}/register",
+                issuer,
+                authorization_endpoint = $"{issuer}/authorize",
+                token_endpoint = $"{issuer}/token",
+                registration_endpoint = $"{issuer}/register",
                 response_types_supported = new[] { "code" },
                 grant_types_supported = new[] { "authorization_code", "refresh_token" },
                 code_challenge_methods_supported = new[] { "S256" },

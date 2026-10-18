@@ -47,7 +47,7 @@ public class BearerAuthMiddleware(RequestDelegate next, TokenProtector protector
 
     private static Task Challenge(HttpContext context, string? error)
     {
-        var value = $"Bearer resource_metadata=\"{OAuthSettings.ProtectedResourceMetadataUrl}\"";
+        var value = $"Bearer resource_metadata=\"{OAuthSettings.GetProtectedResourceMetadataUrl(context)}\"";
         if (error is not null)
         {
             value += $", error=\"{error}\"";

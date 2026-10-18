@@ -1,9 +1,19 @@
+using Microsoft.AspNetCore.HttpOverrides;
 using ModelContextProtocol.Server;
 using System.ComponentModel;
 using WebMCP;
 using WebMCP.OAuth;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Behind a hosting proxy (TLS terminated upstream), take scheme and host from X-Forwarded-* so the
+// metadata advertises the public https URL. Locally there is no proxy and the request URL is used as-is.
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost;
+    options.KnownIPNetworks.Clear();
+    options.KnownProxies.Clear();
+});
 builder.Services.AddDataProtection();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddSingleton<TokenProtector>();
@@ -13,6 +23,8 @@ builder.Services
     .WithToolsFromAssembly();
 
 var app = builder.Build();
+
+app.UseForwardedHeaders();
 
 app.Use(async (context, next) =>
 {
