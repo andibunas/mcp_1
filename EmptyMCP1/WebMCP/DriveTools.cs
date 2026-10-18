@@ -4,6 +4,7 @@ using Google.Apis.Auth.OAuth2;
 using Google.Apis.Drive.v3;
 using Google.Apis.Drive.v3.Data;
 using Google.Apis.Services;
+using Google.Apis.Upload;
 using log4net;
 using ModelContextProtocol.Server;
 using WebMCP.OAuth;
@@ -21,6 +22,10 @@ public static class DriveTools
     private static readonly ILog Log = LogManager.GetLogger(typeof(DriveTools));
 
     private const string FolderMimeType = "application/vnd.google-apps.folder";
+    private const string DocMimeType = "application/vnd.google-apps.document";
+    private const string SheetMimeType = "application/vnd.google-apps.spreadsheet";
+    private const string SlidesMimeType = "application/vnd.google-apps.presentation";
+    private const long MaxReadBytes = 1024 * 1024;
     private const string FileFields = "nextPageToken, files(id, name, mimeType, parents, modifiedTime, size)";
 
     [McpServerTool(Name = "list"), Description(
@@ -33,15 +38,7 @@ public static class DriveTools
     {
         Log.Info($"folder='{folder}'");
 
-        var json = httpContextAccessor.HttpContext?.Items[OAuthSettings.CredentialItemKey] as string
-            ?? throw new InvalidOperationException("No service account credential is attached to this request.");
-
-        var credential = GoogleCredential.FromJson(json).CreateScoped(DriveService.Scope.DriveReadonly);
-        using var drive = new DriveService(new BaseClientService.Initializer
-        {
-            HttpClientInitializer = credential,
-            ApplicationName = "WebMCP"
-        });
+        using var drive = CreateDrive(httpContextAccessor, DriveService.Scope.DriveReadonly);
 
         var trimmed = folder?.Trim();
         var isRoot = string.IsNullOrEmpty(trimmed) || trimmed == "/";
@@ -66,6 +63,159 @@ public static class DriveTools
 
         return Format(label, items);
     }
+
+    [McpServerTool(Name = "read"), Description(
+        "Reads a text file from Google Drive and returns its contents. " +
+        "Pass a path such as \"/Reports/2026/notes.txt\" or a file ID (no slashes). " +
+        "Google Docs are returned as plain text, Sheets as CSV. Binary files and files over 1 MB are refused.")]
+    public static async Task<string> Read(
+        IHttpContextAccessor httpContextAccessor,
+        [Description("File path (\"/Reports/2026/notes.txt\") or file ID.")] string path)
+    {
+        Log.Info($"path='{path}'");
+
+        using var drive = CreateDrive(httpContextAccessor, DriveService.Scope.DriveReadonly);
+        var file = await ResolveFileAsync(drive, path.Trim());
+
+        // Google-native files have no bytes of their own, so they are exported to a text format.
+        string? exportMimeType = file.MimeType switch
+        {
+            DocMimeType or SlidesMimeType => "text/plain",
+            SheetMimeType => "text/csv",
+            _ => null
+        };
+        if (exportMimeType is null)
+        {
+            if (file.MimeType.StartsWith("application/vnd.google-apps.", StringComparison.Ordinal))
+                throw new InvalidOperationException($"'{path}' is a Google {file.MimeType} and cannot be read as text.");
+            if (!IsTextMimeType(file.MimeType))
+                throw new InvalidOperationException($"'{path}' is not a text file ({file.MimeType}).");
+        }
+
+        if (file.Size is > MaxReadBytes)
+        {
+            throw new InvalidOperationException($"'{path}' is {file.Size} bytes; the read limit is {MaxReadBytes} bytes.");
+        }
+
+        using var stream = exportMimeType is null
+            ? await drive.Files.Get(file.Id).ExecuteAsStreamAsync()
+            : await drive.Files.Export(file.Id, exportMimeType).ExecuteAsStreamAsync();
+        using var buffer = new MemoryStream();
+        await stream.CopyToAsync(buffer);
+        if (buffer.Length > MaxReadBytes)
+        {
+            throw new InvalidOperationException($"'{path}' is larger than the read limit of {MaxReadBytes} bytes.");
+        }
+
+        return Encoding.UTF8.GetString(buffer.ToArray());
+    }
+
+    [McpServerTool(Name = "write"), Description(
+        "Writes a text file to Google Drive. Pass a path such as \"/Reports/2026/notes.txt\"; the folder must already exist and be shared " +
+        "with the service account with Editor access. If a file with that name already exists in the folder it is overwritten, otherwise it is created.")]
+    public static async Task<string> Write(
+        IHttpContextAccessor httpContextAccessor,
+        [Description("File path (\"/Reports/2026/notes.txt\"). The file name is the last segment; the folder must exist.")] string path,
+        [Description("Text to write to the file.")] string content)
+    {
+        Log.Info($"path='{path}' bytes={Encoding.UTF8.GetByteCount(content)}");
+
+        var trimmed = path.Trim().TrimEnd('/');
+        var slash = trimmed.LastIndexOf('/');
+        var name = slash < 0 ? trimmed : trimmed[(slash + 1)..];
+        var folder = slash <= 0 ? "" : trimmed[..slash];
+        if (string.IsNullOrEmpty(name) || string.IsNullOrEmpty(folder))
+        {
+            throw new InvalidOperationException("Pass a path inside a folder, such as \"/Reports/notes.txt\". The top level cannot hold files.");
+        }
+
+        using var drive = CreateDrive(httpContextAccessor, DriveService.Scope.Drive);
+        var parentId = await ResolveFolderIdAsync(drive, folder);
+
+        var existing = await QueryAsync(drive,
+            $"name = '{EscapeQuery(name)}' and '{parentId}' in parents and mimeType != '{FolderMimeType}' and trashed = false");
+        if (existing.Count > 1)
+        {
+            throw new InvalidOperationException($"More than one file named '{name}' exists in '{folder}'. Remove the duplicates first.");
+        }
+
+        using var stream = new MemoryStream(Encoding.UTF8.GetBytes(content));
+        IUploadProgress progress;
+        string action;
+        if (existing.Count == 1)
+        {
+            var update = drive.Files.Update(new DriveFile(), existing[0].Id, stream, "text/plain");
+            update.SupportsAllDrives = true;
+            progress = await update.UploadAsync();
+            action = "Overwrote";
+        }
+        else
+        {
+            var create = drive.Files.Create(new DriveFile { Name = name, Parents = new List<string> { parentId } }, stream, "text/plain");
+            create.SupportsAllDrives = true;
+            progress = await create.UploadAsync();
+            action = "Created";
+        }
+
+        if (progress.Status == UploadStatus.Failed)
+        {
+            throw new InvalidOperationException($"Upload failed: {progress.Exception?.Message}");
+        }
+
+        return $"{action} '{trimmed}' ({Encoding.UTF8.GetByteCount(content)} bytes).";
+    }
+
+    private static DriveService CreateDrive(IHttpContextAccessor httpContextAccessor, string scope)
+    {
+        var json = httpContextAccessor.HttpContext?.Items[OAuthSettings.CredentialItemKey] as string
+            ?? throw new InvalidOperationException("No service account credential is attached to this request.");
+
+        var credential = GoogleCredential.FromJson(json).CreateScoped(scope);
+        return new DriveService(new BaseClientService.Initializer
+        {
+            HttpClientInitializer = credential,
+            ApplicationName = "WebMCP"
+        });
+    }
+
+    private static async Task<DriveFile> ResolveFileAsync(DriveService drive, string path)
+    {
+        if (!path.Contains('/'))
+        {
+            var getById = drive.Files.Get(path);
+            getById.Fields = "id, name, mimeType, size";
+            return await getById.ExecuteAsync();
+        }
+
+        var slash = path.LastIndexOf('/');
+        var name = path[(slash + 1)..];
+        var folder = path[..slash];
+        if (string.IsNullOrEmpty(name))
+        {
+            throw new InvalidOperationException($"'{path}' does not name a file.");
+        }
+
+        var q = $"name = '{EscapeQuery(name)}' and trashed = false";
+        if (folder.Length > 0)
+        {
+            q += $" and '{await ResolveFolderIdAsync(drive, folder)}' in parents";
+        }
+
+        var matches = await QueryAsync(drive, q);
+        if (matches.Count == 0)
+        {
+            throw new InvalidOperationException($"File '{name}' not found in '{path}'.");
+        }
+        if (matches.Count > 1)
+        {
+            throw new InvalidOperationException($"More than one file named '{name}' is visible. Pass its file ID instead.");
+        }
+        return matches[0];
+    }
+
+    private static bool IsTextMimeType(string mimeType) =>
+        mimeType.StartsWith("text/", StringComparison.Ordinal) ||
+        mimeType is "application/json" or "application/xml" or "application/javascript" or "application/yaml";
 
     private static async Task<string> ResolveFolderIdAsync(DriveService drive, string folder)
     {
