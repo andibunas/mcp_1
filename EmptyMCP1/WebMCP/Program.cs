@@ -38,7 +38,7 @@ app.Use(async (context, next) =>
     requestLog.Info("====================== Starting =======================");
     requestLog.Info($"Incoming request : {context.Request.Method} {context.Request.Path} {context.Request.QueryString}");
     LogHelper.LogRequestHeaders(context);
-    await LogHelper.LogRequestBodyAsync(context);
+    var callName = await LogHelper.LogRequestBodyAsync(context, "write");
     requestLog.Info("----- calling next() -----");
 
     var originalBody = context.Response.Body;
@@ -54,7 +54,7 @@ app.Use(async (context, next) =>
         {
             requestLog.Info($"Response: << {context.Response.StatusCode} {context.Response.ContentType}");
             LogHelper.LogResponseHeaders(context);
-            await LogHelper.LogResponseBodyAsync(responseBuffer, originalBody);
+            await LogHelper.LogResponseBodyAsync(responseBuffer, originalBody, callName, "read");
             context.Response.Body = originalBody;
         }
     }
