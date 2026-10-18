@@ -31,7 +31,7 @@ public static class DriveTools
         IHttpContextAccessor httpContextAccessor,
         [Description("Folder path (\"/Reports/2026\") or folder ID. Empty or \"/\" means the top level.")] string? folder = null)
     {
-        Log.Info($"[DriveTools.List] folder='{folder}'");
+        Log.Info($"folder='{folder}'");
 
         var json = httpContextAccessor.HttpContext?.Items[OAuthSettings.CredentialItemKey] as string
             ?? throw new InvalidOperationException("No service account credential is attached to this request.");

@@ -27,12 +27,12 @@ public class TokenProtector(IDataProtectionProvider provider)
     // Payloads are not logged: they carry the service account private key.
     public string Protect<T>(string purpose, T payload, TimeSpan lifetime)
     {
-        Log.Info($"[TokenProtector.Protect] Starting - purpose={purpose}, lifetime={lifetime.TotalSeconds}s");
-        Log.Info($"[TokenProtector.Protect] Payload type: {typeof(T).Name}");
+        Log.Info($"Starting - purpose={purpose}, lifetime={lifetime.TotalSeconds}s");
+        Log.Info($"Payload type: {typeof(T).Name}");
         var protector = provider.CreateProtector(purpose).ToTimeLimitedDataProtector();
         var serialized = JsonSerializer.Serialize(payload);
         var protected_value = protector.Protect(serialized, lifetime);
-        Log.Info($"[TokenProtector.Protect] Protected value created (length={protected_value.Length})");
+        Log.Info($"Protected value created (length={protected_value.Length})");
         return protected_value;
     }
 
@@ -40,18 +40,18 @@ public class TokenProtector(IDataProtectionProvider provider)
     public bool TryUnprotect<T>(string purpose, string? value, out T? payload) where T : class
     {
         payload = null;
-        Log.Info($"[TokenProtector.TryUnprotect] Starting - purpose={purpose}, payload type={typeof(T).Name}");
+        Log.Info($"Starting - purpose={purpose}, payload type={typeof(T).Name}");
 
         if (string.IsNullOrEmpty(value))
         {
-            Log.Warn("[TokenProtector.TryUnprotect] Value is null or empty - returning false");
+            Log.Warn("Value is null or empty - returning false");
             return false;
         }
 
-        Log.Info($"[TokenProtector.TryUnprotect] Value length: {value.Length}");
+        Log.Info($"Value length: {value.Length}");
         try
         {
-            Log.Info("[TokenProtector.TryUnprotect] Creating protector and unprotecting...");
+            Log.Info("Creating protector and unprotecting...");
             var protector = provider.CreateProtector(purpose).ToTimeLimitedDataProtector();
             var unprotected = protector.Unprotect(value);
 
@@ -60,12 +60,12 @@ public class TokenProtector(IDataProtectionProvider provider)
         }
         catch (CryptographicException ex)
         {
-            Log.Warn($"[TokenProtector.TryUnprotect] CryptographicException: {ex.Message}");
+            Log.Warn($"CryptographicException: {ex.Message}");
             return false;
         }
         catch (JsonException ex)
         {
-            Log.Warn($"[TokenProtector.TryUnprotect] JsonException: {ex.Message}");
+            Log.Warn($"JsonException: {ex.Message}");
             return false;
         }
     }

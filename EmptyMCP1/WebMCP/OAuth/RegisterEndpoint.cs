@@ -17,33 +17,33 @@ public static class RegisterEndpoint
     {
         app.MapPost($"{OAuthSettings.IssuerPath}/register", async (HttpContext ctx, TokenProtector protector) =>
         {
-            Log.Info("[RegisterEndpoint] /register endpoint hit");
+            Log.Info("/register endpoint hit");
             JsonElement body;
             try
             {
                 body = await ctx.Request.ReadFromJsonAsync<JsonElement>();
-                Log.Info("[RegisterEndpoint] JSON body parsed successfully");
+                Log.Info("JSON body parsed successfully");
             }
             catch (JsonException)
             {
-                Log.Warn("[RegisterEndpoint] Failed to parse JSON body");
+                Log.Warn("Failed to parse JSON body");
                 return Error("invalid_client_metadata", "Body must be JSON.");
             }
 
-            Log.Info($"[RegisterEndpoint] Body kind: {body.ValueKind}");
+            Log.Info($"Body kind: {body.ValueKind}");
             if (body.ValueKind != JsonValueKind.Object
                 || !body.TryGetProperty("redirect_uris", out var uris)
                 || uris.ValueKind != JsonValueKind.Array)
             {
-                Log.Warn("[RegisterEndpoint] Invalid body structure - must be object with redirect_uris array");
+                Log.Warn("Invalid body structure - must be object with redirect_uris array");
                 return Error("invalid_redirect_uri", "redirect_uris must be a non-empty array.");
             }
 
             var uriCount = uris.GetArrayLength();
-            Log.Info($"[RegisterEndpoint] redirect_uris array length: {uriCount}");
+            Log.Info($"redirect_uris array length: {uriCount}");
             if (uriCount is 0 or > 10)
             {
-                Log.Warn($"[RegisterEndpoint] Invalid redirect_uris count - must be 1-10, got {uriCount}");
+                Log.Warn($"Invalid redirect_uris count - must be 1-10, got {uriCount}");
                 return Error("invalid_redirect_uri", "redirect_uris must be a non-empty array.");
             }
 
@@ -51,21 +51,21 @@ public static class RegisterEndpoint
             foreach (var item in uris.EnumerateArray())
             {
                 var value = item.ValueKind == JsonValueKind.String ? item.GetString() : null;
-                Log.Info($"[RegisterEndpoint] Validating redirect_uri: {value}");
+                Log.Info($"Validating redirect_uri: {value}");
                 if (!IsAllowedRedirectUri(value))
                 {
-                    Log.Warn($"[RegisterEndpoint] Redirect URI not allowed: {value}");
+                    Log.Warn($"Redirect URI not allowed: {value}");
                     return Error("invalid_redirect_uri", $"Redirect URI not allowed: {value}");
                 }
                 redirectUris.Add(value!);
             }
 
             string? name = body.TryGetProperty("client_name", out var n) && n.ValueKind == JsonValueKind.String ? n.GetString() : null;
-            Log.Info($"[RegisterEndpoint] Client name: {name ?? "(none)"}");
+            Log.Info($"Client name: {name ?? "(none)"}");
 
             var clientId = protector.Protect(TokenProtector.ClientPurpose,
                 new ClientPayload([.. redirectUris], name), OAuthSettings.ClientIdLifetime);
-            Log.Info($"[RegisterEndpoint] Registered client '{name}' with {redirectUris.Count} redirect URI(s)");
+            Log.Info($"Registered client '{name}' with {redirectUris.Count} redirect URI(s)");
 
             return Results.Json(new
             {
@@ -81,7 +81,7 @@ public static class RegisterEndpoint
 
     private static IResult Error(string error, string description)
     {
-        Log.Warn($"[RegisterEndpoint.Error] {error}: {description}");
+        Log.Warn($"{error}: {description}");
         return Results.Json(new { error, error_description = description }, statusCode: StatusCodes.Status400BadRequest);
     }
 
@@ -89,26 +89,26 @@ public static class RegisterEndpoint
     {
         if (!Uri.TryCreate(value, UriKind.Absolute, out var uri))
         {
-            Log.Warn($"[RegisterEndpoint.IsAllowedRedirectUri] Not a valid absolute URI: {value}");
+            Log.Warn($"Not a valid absolute URI: {value}");
             return false;
         }
         if (uri.Fragment.Length > 0)
         {
-            Log.Warn("[RegisterEndpoint.IsAllowedRedirectUri] URI has fragment, not allowed");
+            Log.Warn("URI has fragment, not allowed");
             return false;
         }
         if (BlockedSchemes.Contains(uri.Scheme))
         {
-            Log.Warn($"[RegisterEndpoint.IsAllowedRedirectUri] Scheme '{uri.Scheme}' is blocked");
+            Log.Warn($"Scheme '{uri.Scheme}' is blocked");
             return false;
         }
         if (uri.Scheme == Uri.UriSchemeHttp)
         {
             var allowed = uri.IsLoopback;
-            Log.Info($"[RegisterEndpoint.IsAllowedRedirectUri] HTTP scheme - loopback={uri.IsLoopback}, allowed={allowed}");
+            Log.Info($"HTTP scheme - loopback={uri.IsLoopback}, allowed={allowed}");
             return allowed;
         }
-        Log.Info($"[RegisterEndpoint.IsAllowedRedirectUri] Scheme '{uri.Scheme}' is allowed");
+        Log.Info($"Scheme '{uri.Scheme}' is allowed");
         return true;
     }
 }

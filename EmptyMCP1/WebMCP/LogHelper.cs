@@ -22,7 +22,7 @@ public static class LogHelper
         foreach (var (name, value) in context.Request.Headers)
         {
             var displayValue = FormatHeaderValue(name, value.ToString());
-            Log.Info($"[RequestLogging]   {name}: {displayValue}");
+            Log.Info($"  {name}: {displayValue}");
         }
     }
 
@@ -30,18 +30,18 @@ public static class LogHelper
     {
         if (context.Request.ContentLength.HasValue && context.Request.ContentLength > 0)
         {
-            Log.Info($"[RequestLogging] Content-Length: {context.Request.ContentLength}");
+            Log.Info($"Content-Length: {context.Request.ContentLength}");
             context.Request.EnableBuffering();
             using (var reader = new StreamReader(context.Request.Body, leaveOpen: true))
             {
                 var body = await reader.ReadToEndAsync();
-                Log.Info($"[RequestLogging] Request Body:\n{body}");
+                Log.Info($"Request Body:\n{body}");
                 context.Request.Body.Position = 0;
             }
         }
         else
         {
-            Log.Info("[RequestLogging] No request body");
+            Log.Info("No request body");
         }
     }
 
@@ -50,7 +50,7 @@ public static class LogHelper
         foreach (var (name, value) in context.Response.Headers)
         {
             var displayValue = FormatHeaderValue(name, value.ToString());
-            Log.Info($"[RequestLogging]   < {name}: {displayValue}");
+            Log.Info($"  < {name}: {displayValue}");
         }
     }
 
@@ -60,7 +60,7 @@ public static class LogHelper
         var responseBody = await new StreamReader(responseBuffer).ReadToEndAsync();
         if (!string.IsNullOrEmpty(responseBody))
         {
-            Log.Info($"[RequestLogging] Response Body:\n{responseBody}");
+            Log.Info($"Response Body:\n{responseBody}");
         }
 
         responseBuffer.Position = 0;

@@ -36,10 +36,10 @@ var requestLog = LogManager.GetLogger("WebMCP.RequestLogging");
 app.Use(async (context, next) =>
 {
     requestLog.Info("====================== Starting =======================");
-    requestLog.Info($"[RequestLogging] Incoming request : {context.Request.Method} {context.Request.Path} {context.Request.QueryString}");
+    requestLog.Info($"Incoming request : {context.Request.Method} {context.Request.Path} {context.Request.QueryString}");
     LogHelper.LogRequestHeaders(context);
     await LogHelper.LogRequestBodyAsync(context);
-    requestLog.Info("[RequestLogging] ----- calling next() -----");
+    requestLog.Info("----- calling next() -----");
 
     var originalBody = context.Response.Body;
     using (var responseBuffer = new MemoryStream())
@@ -52,7 +52,7 @@ app.Use(async (context, next) =>
         }
         finally
         {
-            requestLog.Info($"[RequestLogging] Response: << {context.Response.StatusCode} {context.Response.ContentType}");
+            requestLog.Info($"Response: << {context.Response.StatusCode} {context.Response.ContentType}");
             LogHelper.LogResponseHeaders(context);
             await LogHelper.LogResponseBodyAsync(responseBuffer, originalBody);
             context.Response.Body = originalBody;

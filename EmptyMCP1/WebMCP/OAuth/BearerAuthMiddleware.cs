@@ -15,7 +15,7 @@ public class BearerAuthMiddleware(RequestDelegate next, TokenProtector protector
         // Exact match: the MCP endpoint is the root, so StartsWithSegments("/") would match every path.
         if (context.Request.Path.Value != OAuthSettings.McpPath)
         {
-            Log.Info("[BearerAuthMiddleware] Path is not the MCP endpoint, skipping auth");
+            Log.Info("Path is not the MCP endpoint, skipping auth");
             await next(context);
             return;
         }
@@ -24,22 +24,22 @@ public class BearerAuthMiddleware(RequestDelegate next, TokenProtector protector
 
         if (header is null || !header.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
         {
-            Log.Warn("[BearerAuthMiddleware] Missing or invalid Bearer token, sending challenge");
+            Log.Warn("Missing or invalid Bearer token, sending challenge");
             await Challenge(context, error: null);
             return;
         }
 
         var token = header["Bearer ".Length..].Trim();
-        Log.Info("[BearerAuthMiddleware] Attempting to unprotect access token");
+        Log.Info("Attempting to unprotect access token");
 
         if (!protector.TryUnprotect<AccessPayload>(TokenProtector.AccessPurpose, token, out var access))
         {
-            Log.Warn("[BearerAuthMiddleware] Failed to unprotect token, sending challenge");
+            Log.Warn("Failed to unprotect token, sending challenge");
             await Challenge(context, error: "invalid_token");
             return;
         }
 
-        Log.Info("[BearerAuthMiddleware] Token unprotected successfully, attaching credential to context");
+        Log.Info("Token unprotected successfully, attaching credential to context");
         context.Items[OAuthSettings.CredentialItemKey] = access!.Credential;
         await next(context);
     }
@@ -50,11 +50,11 @@ public class BearerAuthMiddleware(RequestDelegate next, TokenProtector protector
         if (error is not null)
         {
             value += $", error=\"{error}\"";
-            Log.Warn($"[BearerAuthMiddleware.Challenge] Sending 401 with error: {error}");
+            Log.Warn($"Sending 401 with error: {error}");
         }
         else
         {
-            Log.Warn("[BearerAuthMiddleware.Challenge] Sending 401 challenge");
+            Log.Warn("Sending 401 challenge");
         }
 
         context.Response.StatusCode = StatusCodes.Status401Unauthorized;
