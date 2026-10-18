@@ -120,11 +120,8 @@ public static class DriveTools
     {
         Log.Info($"path='{path}' bytes={Encoding.UTF8.GetByteCount(content)}");
 
-        var trimmed = path.Trim().TrimEnd('/');
-        var slash = trimmed.LastIndexOf('/');
-        var name = slash < 0 ? trimmed : trimmed[(slash + 1)..];
-        var folder = slash <= 0 ? "" : trimmed[..slash];
-        if (string.IsNullOrEmpty(name) || string.IsNullOrEmpty(folder))
+        var (folder, name) = SplitPath(path);
+        if (folder.Length == 0)
         {
             throw new InvalidOperationException("Pass a path inside a folder, such as \"/Reports/notes.txt\". The top level cannot hold files.");
         }
@@ -162,7 +159,133 @@ public static class DriveTools
             throw new InvalidOperationException($"Upload failed: {progress.Exception?.Message}");
         }
 
-        return $"{action} '{trimmed}' ({Encoding.UTF8.GetByteCount(content)} bytes).";
+        return $"{action} '{path.Trim()}' ({Encoding.UTF8.GetByteCount(content)} bytes).";
+    }
+
+    [McpServerTool(Name = "create_folder"), Description(
+        "Creates a folder in Google Drive. Pass a path such as \"/Reports/2026\"; the parent folder must already exist and be shared " +
+        "with the service account with Editor access. A single name such as \"/Reports\" creates it at the top level.")]
+    public static async Task<string> CreateFolder(
+        IHttpContextAccessor httpContextAccessor,
+        [Description("Folder path to create (\"/Reports/2026\").")] string path)
+    {
+        Log.Info($"path='{path}'");
+
+        var (parent, name) = SplitPath(path);
+        using var drive = CreateDrive(httpContextAccessor, DriveService.Scope.Drive);
+
+        var body = new DriveFile { Name = name, MimeType = FolderMimeType };
+        if (parent.Length > 0)
+        {
+            var parentId = await ResolveFolderIdAsync(drive, parent);
+            var existing = await QueryAsync(drive,
+                $"name = '{EscapeQuery(name)}' and '{parentId}' in parents and mimeType = '{FolderMimeType}' and trashed = false");
+            if (existing.Count > 0)
+            {
+                throw new InvalidOperationException($"A folder named '{name}' already exists in '{parent}'.");
+            }
+            body.Parents = new List<string> { parentId };
+        }
+
+        var create = drive.Files.Create(body);
+        create.Fields = "id";
+        create.SupportsAllDrives = true;
+        var created = await create.ExecuteAsync();
+        return $"Created folder '{path.Trim()}' (id: {created.Id}).";
+    }
+
+    [McpServerTool(Name = "move"), Description(
+        "Renames or moves a file or folder in Google Drive. Pass the current path or ID, and the new path. " +
+        "The last segment of the new path is the new name. The destination folder must already exist and cannot be the top level. " +
+        "Use the same folder in both paths to rename only.")]
+    public static async Task<string> Move(
+        IHttpContextAccessor httpContextAccessor,
+        [Description("Current path (\"/Reports/old.txt\") or file/folder ID.")] string path,
+        [Description("New path (\"/Archive/2026/notes.txt\"). The last segment is the new name.")] string newPath)
+    {
+        Log.Info($"path='{path}' newPath='{newPath}'");
+
+        using var drive = CreateDrive(httpContextAccessor, DriveService.Scope.Drive);
+        var item = await ResolveFileAsync(drive, path.Trim());
+
+        var (destFolder, newName) = SplitPath(newPath);
+        if (destFolder.Length == 0)
+        {
+            throw new InvalidOperationException("The new path must be inside a folder, such as \"/Archive/notes.txt\".");
+        }
+        var destId = await ResolveFolderIdAsync(drive, destFolder);
+
+        var update = drive.Files.Update(new DriveFile { Name = newName }, item.Id);
+        update.AddParents = destId;
+        var oldParents = string.Join(",", (item.Parents ?? new List<string>()).Where(p => p != destId));
+        update.RemoveParents = oldParents.Length > 0 ? oldParents : null;
+        update.Fields = "id";
+        update.SupportsAllDrives = true;
+        await update.ExecuteAsync();
+
+        return $"Moved '{path.Trim()}' to '{newPath.Trim()}'.";
+    }
+
+    [McpServerTool(Name = "search"), Description(
+        "Searches the Google Drive folders and files shared with the service account, matching file names and text contents. " +
+        "Returns each match with its ID.")]
+    public static async Task<string> Search(
+        IHttpContextAccessor httpContextAccessor,
+        [Description("Text to look for in file names and contents.")] string text)
+    {
+        Log.Info($"text='{text}'");
+
+        var term = text.Trim();
+        if (term.Length == 0)
+        {
+            throw new InvalidOperationException("Pass some text to search for.");
+        }
+
+        using var drive = CreateDrive(httpContextAccessor, DriveService.Scope.DriveReadonly);
+        var escaped = EscapeQuery(term);
+        var items = await QueryAsync(drive, $"(name contains '{escaped}' or fullText contains '{escaped}') and trashed = false");
+        return Format($"search '{term}'", items);
+    }
+
+    [McpServerTool(Name = "metadata"), Description(
+        "Returns the details of a file or folder without its contents: ID, type, size, parent folder IDs, created and modified times, and a link. " +
+        "Pass a path such as \"/Reports/2026/notes.txt\" or a file/folder ID.")]
+    public static async Task<string> Metadata(
+        IHttpContextAccessor httpContextAccessor,
+        [Description("File or folder path, or file/folder ID.")] string path)
+    {
+        Log.Info($"path='{path}'");
+
+        using var drive = CreateDrive(httpContextAccessor, DriveService.Scope.DriveReadonly);
+        var item = await ResolveFileAsync(drive, path.Trim());
+
+        var get = drive.Files.Get(item.Id);
+        get.Fields = "id, name, mimeType, size, parents, createdTime, modifiedTime, webViewLink";
+        var full = await get.ExecuteAsync();
+
+        var sb = new StringBuilder();
+        sb.AppendLine($"Name: {full.Name}");
+        sb.AppendLine($"ID: {full.Id}");
+        sb.AppendLine($"Type: {full.MimeType}");
+        sb.AppendLine($"Size: {(full.Size is null ? "-" : $"{full.Size} bytes")}");
+        sb.AppendLine($"Parent IDs: {(full.Parents is null || full.Parents.Count == 0 ? "-" : string.Join(", ", full.Parents))}");
+        sb.AppendLine($"Created: {full.CreatedTimeDateTimeOffset?.ToString("yyyy-MM-dd HH:mm") ?? "-"}");
+        sb.AppendLine($"Modified: {full.ModifiedTimeDateTimeOffset?.ToString("yyyy-MM-dd HH:mm") ?? "-"}");
+        sb.Append($"Link: {full.WebViewLink ?? "-"}");
+        return sb.ToString();
+    }
+
+    private static (string Parent, string Name) SplitPath(string path)
+    {
+        var trimmed = path.Trim().TrimEnd('/');
+        var slash = trimmed.LastIndexOf('/');
+        var name = slash < 0 ? trimmed : trimmed[(slash + 1)..];
+        if (string.IsNullOrEmpty(name))
+        {
+            throw new InvalidOperationException($"'{path}' does not name a file or folder.");
+        }
+        var parent = slash <= 0 ? "" : trimmed[..slash];
+        return (parent, name);
     }
 
     private static DriveService CreateDrive(IHttpContextAccessor httpContextAccessor, string scope)
@@ -183,7 +306,7 @@ public static class DriveTools
         if (!path.Contains('/'))
         {
             var getById = drive.Files.Get(path);
-            getById.Fields = "id, name, mimeType, size";
+            getById.Fields = "id, name, mimeType, size, parents";
             return await getById.ExecuteAsync();
         }
 
