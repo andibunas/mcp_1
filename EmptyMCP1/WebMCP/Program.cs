@@ -19,7 +19,6 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
     options.KnownIPNetworks.Clear();
     options.KnownProxies.Clear();
 });
-builder.Services.AddDataProtection();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddSingleton<TokenProtector>();
 builder.Services
