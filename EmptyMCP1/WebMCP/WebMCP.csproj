@@ -18,4 +18,10 @@
     <PackageReference Include="Google.Apis.Drive.v3" Version="1.69.0.3674" />
   </ItemGroup>
 
+  <!-- Also delete the whole bin and obj folders when running "dotnet clean" -->
+  <Target Name="CleanBinObjFolders" AfterTargets="Clean">
+    <RemoveDir Directories="$([MSBuild]::NormalizeDirectory($(MSBuildProjectDirectory), $(BaseOutputPath)))" ContinueOnError="true" />
+    <RemoveDir Directories="$([MSBuild]::NormalizeDirectory($(MSBuildProjectDirectory), $(BaseIntermediateOutputPath)))" ContinueOnError="true" />
+  </Target>
+
 </Project>

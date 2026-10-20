@@ -1,7 +1,9 @@
 using System.ComponentModel;
 using System.IO.Compression;
+using System.Net;
 using System.Text;
 using System.Xml.Linq;
+using Google;
 using Google.Apis.Auth.OAuth2;
 using Google.Apis.Drive.v3;
 using Google.Apis.Drive.v3.Data;
@@ -462,19 +464,19 @@ public static class DriveTools
 
     private static async Task<string> ResolveFolderIdAsync(DriveService drive, string folder)
     {
-        if (!folder.Contains('/'))
-        {
-            var folderById = await drive.Files.Get(folder).ExecuteAsync();
-            if (folderById.MimeType != FolderMimeType)
-            {
-                throw new InvalidOperationException($"'{folder}' is not a folder.");
-            }
-            return folder;
-        }
-
         string? parentId = null;
-        foreach (var segment in folder.Split('/', StringSplitOptions.RemoveEmptyEntries))
+        var segments = folder.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        for (var i = 0; i < segments.Length; i++)
         {
+            var segment = segments[i];
+
+            // The first segment may be a folder ID. Anything that is not a folder the account can see falls back to a name lookup.
+            if (i == 0 && await TryGetFolderIdAsync(drive, segment) is { } folderId)
+            {
+                parentId = folderId;
+                continue;
+            }
+
             var q = $"name = '{EscapeQuery(segment)}' and mimeType = '{FolderMimeType}' and trashed = false";
             if (parentId is not null)
             {
@@ -493,7 +495,22 @@ public static class DriveTools
             parentId = matches[0].Id;
         }
 
-        return parentId!;
+        return parentId ?? throw new InvalidOperationException($"'{folder}' does not name a folder.");
+    }
+
+    private static async Task<string?> TryGetFolderIdAsync(DriveService drive, string id)
+    {
+        try
+        {
+            var request = drive.Files.Get(id);
+            request.SupportsAllDrives = true;
+            var file = await request.ExecuteAsync();
+            return file.MimeType == FolderMimeType ? file.Id : null;
+        }
+        catch (GoogleApiException ex) when (ex.HttpStatusCode is HttpStatusCode.NotFound or HttpStatusCode.BadRequest)
+        {
+            return null;
+        }
     }
 
     private static async Task<List<DriveFile>> QueryAsync(DriveService drive, string q)
