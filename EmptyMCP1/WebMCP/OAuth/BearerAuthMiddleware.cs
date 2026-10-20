@@ -41,6 +41,7 @@ public class BearerAuthMiddleware(RequestDelegate next, TokenProtector protector
 
         Log.Info("Token unprotected successfully, attaching credential to context");
         context.Items[OAuthSettings.CredentialItemKey] = access!.Credential;
+        Log.Info($"Caller identity: {LogHelper.DescribeCaller(access.Credential, token)}");
         await next(context);
     }
 
