@@ -29,6 +29,14 @@ builder.Services
 
 var app = builder.Build();
 
+// Record the socket peer and raw X-Forwarded-For before UseForwardedHeaders rewrites RemoteIpAddress and removes the header
+app.Use(async (context, next) =>
+{
+    context.Items[LogHelper.PeerAddressItemKey] = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+    context.Items[LogHelper.ForwardedForItemKey] = context.Request.Headers["X-Forwarded-For"].ToString();
+    await next();
+});
+
 app.UseForwardedHeaders();
 
 var requestLog = LogManager.GetLogger("WebMCP.RequestLogging");
@@ -37,6 +45,7 @@ app.Use(async (context, next) =>
 {
     requestLog.Info("====================== Starting =======================");
     requestLog.Info($"Incoming request : {context.Request.Method} {context.Request.Path} {context.Request.QueryString}");
+    LogHelper.LogCallerInfo(context);
     LogHelper.LogRequestHeaders(context);
     var callName = await LogHelper.LogRequestBodyAsync(context, "write");
     requestLog.Info("----- calling next() -----");

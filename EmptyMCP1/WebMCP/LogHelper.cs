@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using log4net;
 
@@ -11,6 +13,40 @@ public static class LogHelper
     private const int AuthHeaderDisplayStart = 50;
     private const int AuthHeaderDisplayEnd = 10;
     private const int TruncatedBodyMaxLength = 1000;
+
+    // Set by the first middleware, before UseForwardedHeaders replaces RemoteIpAddress and removes X-Forwarded-For.
+    public const string PeerAddressItemKey = "PeerAddress";
+    public const string ForwardedForItemKey = "ForwardedFor";
+
+    // Who is calling: resolved client IP, the direct socket peer, and the referrer/client headers that identify a caller.
+    public static void LogCallerInfo(HttpContext context)
+    {
+        var request = context.Request;
+        var headers = request.Headers;
+        Log.Info($"Caller ip={context.Connection.RemoteIpAddress} peer={context.Items[PeerAddressItemKey]} x-forwarded-for='{context.Items[ForwardedForItemKey]}'");
+        Log.Info($"Caller referer='{headers["Referer"]}' origin='{headers["Origin"]}' user-agent='{headers["User-Agent"]}'");
+        Log.Info($"Caller host='{request.Host}' x-forwarded-host='{headers["X-Forwarded-Host"]}' accept-language='{headers["Accept-Language"]}' mcp-session-id='{headers["Mcp-Session-Id"]}'");
+    }
+
+    // Identifies the authenticated caller without logging the token: the service account email from the
+    // credential plus a short SHA-256 of the bearer token, so calls from the same token can be correlated.
+    public static string DescribeCaller(string credentialJson, string token)
+    {
+        var tokenFingerprint = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)))[..12];
+        var serviceAccount = "unknown";
+        try
+        {
+            using var doc = JsonDocument.Parse(credentialJson);
+            if (doc.RootElement.TryGetProperty("client_email", out var email))
+            {
+                serviceAccount = email.GetString() ?? serviceAccount;
+            }
+        }
+        catch (JsonException)
+        {
+        }
+        return $"service_account={serviceAccount} token_sha256={tokenFingerprint}";
+    }
 
     public static string FormatHeaderValue(string name, string value)
     {
