@@ -15,7 +15,8 @@ public class Hello
     }
 
     [Function("Hello")]
-    public IActionResult Run([HttpTrigger(AuthorizationLevel.Anonymous, "get", "post")] HttpRequest req)
+    public IActionResult Run(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", "post")] HttpRequest req)
     {
         _logger.LogInformation("C# HTTP trigger function processed a request.");
 
@@ -28,4 +29,19 @@ public class Hello
 
         return new OkObjectResult("Welcome to AZtest1 Functions! <BR>" + headersString);
     }
+
+
+    // function takes name parameter from query string and returns a greeting message   
+    [Function("Goodbye")]
+    public IActionResult RunBye(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", "post")] HttpRequest req,
+        [FromQuery(Name = "name")] string? name
+        )
+    {
+        _logger.LogInformation("Goodbye function processed a request.");
+
+        return new OkObjectResult($"Goodbye, {name ?? "world"}! This is the end!");
+    }
+
+
 }
