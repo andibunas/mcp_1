@@ -19,6 +19,9 @@ public class GCMP
         [McpToolProperty(nameof(name), "The name of the person to greet.")] string? name
     )
     {
+        // dump everything in Transport
+        _logger.LogInformation("Transport: {Transport}", System.Text.Json.JsonSerializer.Serialize(context.Transport));
+
         _logger.LogInformation("C# MCP tool trigger function processed a request.");
         return $"Hello, {name ?? "world"}! This is an MCP Tool!";
     }
