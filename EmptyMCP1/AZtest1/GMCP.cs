@@ -23,6 +23,19 @@ public class GCMP
         _logger.LogInformation("Transport: {Transport}", System.Text.Json.JsonSerializer.Serialize(context.Transport));
 
         _logger.LogInformation("C# MCP tool trigger function processed a request.");
+
+
+        string? auth = null;
+
+        // if (context.Transport?.Properties?.TryGetValue("headers", out var h) == true
+        //     && h is IDictionary<string, string> headers)
+        //     headers.TryGetValue("Authorization", out auth);
+
+        // if (auth != "Bearer expected-token")
+        if (name == "andi")
+            throw new UnauthorizedAccessException("Unauthorized...");
+
+
         return $"Hello, {name ?? "world"}! This is an MCP Tool!";
     }
 }
