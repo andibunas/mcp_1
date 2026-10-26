@@ -1,4 +1,14 @@
 {
     "version": "2.0",
-    "telemetryMode": "OpenTelemetry"
+    "telemetryMode": "OpenTelemetry",
+    "extensions": {
+        "mcp": {
+            "instructions": "gmcp is a sample tool that takes a name input and responds to the user with a hello message.",
+            "serverName": "testGMCP",
+            "serverVersion": "1.0.1",
+            "system": {
+                "webhookAuthorizationLevel": "Anonymous"
+            }
+        }
+    }
 }
