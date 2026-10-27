@@ -19,6 +19,8 @@ public class GCMP
         [McpToolProperty(nameof(name), "The name of the person to greet.")] string? name
     )
     {
+        var transportInfo = System.Text.Json.JsonSerializer.Serialize(context.Transport);
+
         // dump everything in Transport
         _logger.LogInformation("Transport: {Transport}", System.Text.Json.JsonSerializer.Serialize(context.Transport));
 
@@ -36,7 +38,7 @@ public class GCMP
             throw new UnauthorizedAccessException("Unauthorized...");
 
 
-        return $"Hello, {name ?? "world"}! This is an MCP Tool!";
+        return $"Hello, {name ?? "world"}! This is an MCP Tool! Transport: {transportInfo}";
     }
 }
 

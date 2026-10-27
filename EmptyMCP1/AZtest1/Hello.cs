@@ -44,4 +44,24 @@ public class Hello
     }
 
 
+    // plain HTTP endpoint (/api/mcp) emulating MCP JSON-RPC calls so response headers can be controlled
+    [Function("mcp")]
+    public async Task<IActionResult> Mcp(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequest req)
+    {
+        using var reader = new StreamReader(req.Body);
+        var body = await reader.ReadToEndAsync();
+        _logger.LogInformation("mcp emulator request: {Body}", body);
+
+        var result = new McpEmulator().Handle(body);
+
+        foreach (var (key, value) in result.Headers)
+            req.HttpContext.Response.Headers[key] = value;
+
+        return result.Body is null
+            ? new StatusCodeResult(result.StatusCode)
+            : new ContentResult { StatusCode = result.StatusCode, Content = result.Body, ContentType = "application/json" };
+    }
+
+
 }
