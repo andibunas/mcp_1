@@ -4,14 +4,9 @@ using Microsoft.Extensions.Logging;
 
 namespace AZtest1;
 
-public class GCMP
+public class GCMP(ILogger<GCMP> logger)
 {
-    private ILogger<GCMP> _logger;
-
-    public GCMP(ILogger<GCMP> logger)
-    {
-        _logger = logger;
-    }
+    private readonly ILogger<GCMP> _logger = logger;
 
     [Function("gmcp")]
     public string Run(
@@ -22,12 +17,15 @@ public class GCMP
         var transportInfo = System.Text.Json.JsonSerializer.Serialize(context.Transport);
 
         // dump everything in Transport
-        _logger.LogInformation("Transport: {Transport}", System.Text.Json.JsonSerializer.Serialize(context.Transport));
+        // _logger.LogInformation("Transport: {Transport}", System.Text.Json.JsonSerializer.Serialize(context.Transport));
 
         _logger.LogInformation("C# MCP tool trigger function processed a request.");
 
 
-        string? auth = null;
+        var transportType = context.Transport?.GetType().Name ?? "Unknown";
+        // var props = context.Transport?.Properties;
+
+        // string? auth = null;
 
         // if (context.Transport?.Properties?.TryGetValue("headers", out var h) == true
         //     && h is IDictionary<string, string> headers)
@@ -38,7 +36,7 @@ public class GCMP
             throw new UnauthorizedAccessException("Unauthorized...");
 
 
-        return $"Hello, {name ?? "world"}! This is an MCP Tool! Transport: {transportInfo}";
+        return $"Hello, {name ?? "world"}! This is an MCP Tool! type:{transportType} Transport: {transportInfo}";
     }
 }
 
