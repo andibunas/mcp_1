@@ -28,8 +28,8 @@ public class GCMP(ILogger<GCMP> logger)
             httpTransport.Headers.TryGetValue("Authorization", out var authHeader);
             authHeader ??= "No Authorization header found";
             responseVal += $"Authorization Header: {authHeader}\n";
-            _logger.LogInformation("Authorization Header: {AuthHeader}", authHeader);
-            _logger.LogInformation("HTTP Transport Headers: {Headers}", System.Text.Json.JsonSerializer.Serialize(httpTransport.Properties?.GetValueOrDefault("headers")));
+            // _logger.LogInformation("Authorization Header: {AuthHeader}", authHeader);
+            // _logger.LogInformation("HTTP Transport Headers: {Headers}", System.Text.Json.JsonSerializer.Serialize(httpTransport.Properties?.GetValueOrDefault("headers")));
         }
 
         // if (context.Transport?.Properties?.TryGetValue("headers", out var h) == true
