@@ -14,18 +14,23 @@ public class GCMP(ILogger<GCMP> logger)
         [McpToolProperty(nameof(name), "The name of the person to greet.")] string? name
     )
     {
-        var transportInfo = System.Text.Json.JsonSerializer.Serialize(context.Transport);
-
-        // dump everything in Transport
-        // _logger.LogInformation("Transport: {Transport}", System.Text.Json.JsonSerializer.Serialize(context.Transport));
-
         _logger.LogInformation("C# MCP tool trigger function processed a request.");
 
+        var transportInfo = System.Text.Json.JsonSerializer.Serialize(context.Transport);
+        var responseVal = $"Hello, {name ?? "world"}! MCP Tool!\n ";
 
         var transportType = context.Transport?.GetType().Name ?? "Unknown";
-        // var props = context.Transport?.Properties;
+        responseVal += $"Transport Type: {transportType}\n";
 
-        // string? auth = null;
+
+        if (context.Transport is HttpTransport httpTransport)
+        {
+            httpTransport.Headers.TryGetValue("Authorization", out var authHeader);
+            authHeader ??= "No Authorization header found";
+            responseVal += $"Authorization Header: {authHeader}\n";
+            _logger.LogInformation("Authorization Header: {AuthHeader}", authHeader);
+            _logger.LogInformation("HTTP Transport Headers: {Headers}", System.Text.Json.JsonSerializer.Serialize(httpTransport.Properties?.GetValueOrDefault("headers")));
+        }
 
         // if (context.Transport?.Properties?.TryGetValue("headers", out var h) == true
         //     && h is IDictionary<string, string> headers)
@@ -35,8 +40,10 @@ public class GCMP(ILogger<GCMP> logger)
         if (name == "andi")
             throw new UnauthorizedAccessException("Unauthorized...");
 
+        responseVal += $"Transport Info: {transportInfo}\n";
 
-        return $"Hello, {name ?? "world"}! This is an MCP Tool! type:{transportType} Transport: {transportInfo}";
+        return responseVal;
+        // $"Hello, {name ?? "world"}! This is an MCP Tool!\n type:{transportType} \n authHeader:{authHeader} \nTransport: {transportInfo}";
     }
 }
 
